@@ -107,14 +107,24 @@
 
 错误处理：401 / 403 记 error 日志（提示检查 token），其他 4xx / 5xx 记 error 日志和响应前 500 字，超时记 warning，连接失败等异常记 error；这些情况都不回复，流水线照常结束，不会抛出。
 
+### 旁路 `loagent_observe`
+
+文件：`astrbot/core/pipeline/process_stage/method/loagent_observe.py`，由 `WakingCheckStage` 调用。LoAgent 要把群里的每条消息都记进事件记忆，不只是它回复的那些：没有唤醒机器人的群消息在唤醒检查这一步被拦下之前，先交给 `LoAgentObserver`。
+
+- **条件**（全部满足才发）：这份配置打开了 `loagent_observe`、填了 `loagent_project`；是群消息；发送者不是机器人自己；通过这份配置的白名单（白名单阶段在唤醒检查之后，所以这里照同样的规则再查一次，包括「群里管理员不受白名单限制」）；会话整体启用，并且会话管理页的「LLM 开关」（即「转发给 LoAgent」）没关。
+- **请求**：`POST {endpoint}/api/channel/observe`，请求体和 token 与 `loagent_forward` 完全相同（同一个 `build_loagent_request`），`mentions.bot` 自然是 `false`。LoAgent 只入库，返回 `204`，不回复。
+- **不阻塞流水线**：请求在后台任务里发，超时 10 秒。失败只记日志（401 / 403 记 error，其他 HTTP 错误、超时、连接失败记 warning），不影响消息处理。
+- 私聊总是被唤醒（除非开了「私聊需要唤醒词」），被唤醒的消息走 `loagent_forward`，不会重复发到旁路。
+
 ### 配置
 
 | 配置项 | 位置 | 说明 |
 |---|---|---|
-| `loagent_project` | 每份配置（WebUI 配置页「LoAgent」分组） | 这份配置对应的 LoAgent 项目 ID。留空则不转发 |
+| `loagent_project` | 每份配置（WebUI 配置页「LoAgent」分组） | 这份配置对应的 LoAgent 项目 ID。留空则不转发，也不旁听 |
+| `loagent_observe` | 同上 | 「旁听未唤醒的群消息」，默认关。打开后没唤醒的群消息发到 `/api/channel/observe` |
 | `loagent.endpoint` | 默认配置（系统配置），全局 | LoAgent 入口地址，默认 `http://loagent:3080`（compose 网络里的服务名）。环境变量 `LOAGENT_ENDPOINT` 优先 |
-| `loagent.token` | 同上 | Bearer token。环境变量 `LOAGENT_TOKEN` 优先 |
-| `loagent.timeout` | 同上 | 等待回复的秒数，默认 120 |
+| `loagent.token` | 同上 | Bearer token。环境变量 `LOAGENT_TOKEN` 优先，其次 `LOAGENT_CHANNEL_TOKEN`（LoAgent 的 channel-gateway 读的就是这个名字，所以两个容器可以共用一个 env 文件，token 只填一次） |
+| `loagent.timeout` | 同上 | 等待回复的秒数，默认 120（旁路固定 10 秒） |
 
 ## 怎么跟进上游
 
@@ -128,8 +138,11 @@
 
 ## 打包注意
 
-- 管理面板的前端产物（`astrbot/dashboard/dist`）不在仓库里。没有本地产物时，AstrBot 启动会从上游下载**原版** WebUI，里面还有已删页面（调用已删接口会 404）。部署时要先在 `dashboard/` 里 `pnpm build`，把 `dist/` 放进 `astrbot/dashboard/dist`（hatch 构建钩子 `scripts/hatch_build.py` 会做这件事）。
-- `Dockerfile` 和上游一致，未改。
+- 管理面板的前端产物（`astrbot/dashboard/dist`）不在仓库里。没有本地产物、或者产物的 `assets/version` 和核心版本对不上时，AstrBot 启动会从上游下载**原版** WebUI，里面还有已删页面（调用已删接口会 404）。
+- `Dockerfile` 在上游的基础上加了一个 `dashboard` 构建阶段：用 pnpm（和 LoAgent 的 `ci` 容器同一版本）从本分支的 `dashboard/` 构建前端，写入 `dist/assets/version`（取 `pyproject.toml` 的版本，加 `v` 前缀，和上游发布流程一样），再拷进运行镜像的 `astrbot/dashboard/dist`。所以镜像里的 WebUI 就是本分支精简后的界面，启动时不会下载。为此 `.dockerignore` 不再排除整个 `dashboard/`，只排除 `dashboard/node_modules/` 和 `dashboard/dist/`。
+- 不用 Docker 时：在 `dashboard/` 里 `pnpm build`，写好 `dist/assets/version`，把 `dist/` 放进 `astrbot/dashboard/dist`（`ASTRBOT_BUILD_DASHBOARD=1` 时 hatch 构建钩子 `scripts/hatch_build.py` 会构建和拷贝，但不写版本文件）。
+- 「修复管理面板」（`/dashboard_update`）只确认产物和核心版本一致，镜像里自带的产物满足条件，不会下载。但控制台里的「更新 AstrBot」会从上游下载原版核心和界面，覆盖本分支，部署后不要用（升级走重新构建镜像）。
+- LoAgent 的部署（LoAgent 仓库 `deploy/compose.yml` 的 `astrbot` 服务）用这个 Dockerfile 构建，首次启动时用 `deploy/astrbot/cmd_config.seed.json` 生成 `data/cmd_config.json`（预置 OneBot v11 平台 `qq`、`wechat` 和 LoAgent 入口，已有配置不覆盖）。
 
 ## 许可证
 
