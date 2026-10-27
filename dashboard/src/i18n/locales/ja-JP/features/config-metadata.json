@@ -7,6 +7,10 @@
       "loagent_project": {
         "description": "LoAgent Project",
         "hint": "The LoAgent project ID this configuration (persona) maps to. Messages are not forwarded when left empty."
+      },
+      "loagent_observe": {
+        "description": "Observe Unwoken Group Messages",
+        "hint": "When on, group messages that do not wake the bot are also sent to LoAgent's /api/channel/observe: recorded in memory, never answered. The whitelist and session switches still apply."
       }
     }
   },
@@ -702,7 +706,7 @@
         },
         "token": {
           "description": "LoAgent Token",
-          "hint": "Sent as Authorization: Bearer <token>. The LOAGENT_TOKEN environment variable takes precedence."
+          "hint": "Sent as Authorization: Bearer <token>. The LOAGENT_TOKEN environment variable takes precedence, then LOAGENT_CHANNEL_TOKEN."
         },
         "timeout": {
           "description": "LoAgent Request Timeout (seconds)",

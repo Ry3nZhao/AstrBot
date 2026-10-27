@@ -7,6 +7,10 @@
       "loagent_project": {
         "description": "LoAgent 项目",
         "hint": "这份配置（人格）对应的 LoAgent 项目 ID。留空时不转发消息。"
+      },
+      "loagent_observe": {
+        "description": "旁听未唤醒的群消息",
+        "hint": "开启后，群里没有唤醒机器人的消息也会发给 LoAgent 的 /api/channel/observe，只记进记忆，不回复。仍受白名单和会话开关限制。"
       }
     }
   },
@@ -702,7 +706,7 @@
         },
         "token": {
           "description": "LoAgent 入口 token",
-          "hint": "请求时放在 Authorization: Bearer <token> 中。环境变量 LOAGENT_TOKEN 优先。"
+          "hint": "请求时放在 Authorization: Bearer <token> 中。环境变量 LOAGENT_TOKEN 优先，其次是 LOAGENT_CHANNEL_TOKEN。"
         },
         "timeout": {
           "description": "LoAgent 请求超时（秒）",

@@ -106,6 +106,9 @@ DEFAULT_CONFIG = {
     # LoAgent channel gateway: the LoAgent project this configuration (persona)
     # forwards to. Empty means messages are not forwarded.
     "loagent_project": "",
+    # Also send group messages that did not wake the bot to LoAgent's
+    # /api/channel/observe (recorded in memory, never answered).
+    "loagent_observe": False,
     # Global LoAgent entry point. Only read from the default configuration;
     # LOAGENT_ENDPOINT / LOAGENT_TOKEN environment variables take precedence.
     "loagent": {
@@ -1310,6 +1313,11 @@ CONFIG_METADATA_3 = {
                         "type": "string",
                         "hint": "这份配置（人格）对应的 LoAgent 项目 ID。留空时不转发消息。",
                     },
+                    "loagent_observe": {
+                        "description": "旁听未唤醒的群消息",
+                        "type": "bool",
+                        "hint": "开启后，群里没有唤醒机器人的消息也会发给 LoAgent 的 /api/channel/observe，只记进记忆，不回复。仍受白名单和会话开关限制。",
+                    },
                 },
             },
         },
@@ -1724,7 +1732,7 @@ CONFIG_METADATA_3_SYSTEM = {
                     "loagent.token": {
                         "description": "LoAgent 入口 token",
                         "type": "string",
-                        "hint": "请求时放在 Authorization: Bearer <token> 中。环境变量 LOAGENT_TOKEN 优先。",
+                        "hint": "请求时放在 Authorization: Bearer <token> 中。环境变量 LOAGENT_TOKEN 优先，其次是 LOAGENT_CHANNEL_TOKEN。",
                     },
                     "loagent.timeout": {
                         "description": "LoAgent 请求超时（秒）",

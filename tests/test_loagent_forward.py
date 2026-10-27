@@ -22,7 +22,7 @@ from aiohttp import web
 from astrbot.core.config.default import DEFAULT_CONFIG
 from astrbot.core.message.components import At, AtAll, Image, Plain, Reply
 from astrbot.core.pipeline.context import PipelineContext
-from astrbot.core.pipeline.process_stage.method import loagent_forward
+from astrbot.core.pipeline.process_stage.method import loagent_forward, loagent_observe
 from astrbot.core.pipeline.process_stage.method.loagent_forward import (
     build_loagent_request,
     build_reply_chain,
@@ -45,12 +45,24 @@ GROUP_ID = 123456
 
 
 class StubLoAgent:
-    """Minimal LoAgent ``POST /api/channel/message`` implementation."""
+    """Minimal LoAgent ``/api/channel/message`` and ``/api/channel/observe``."""
 
     def __init__(self) -> None:
         self.requests: list[dict] = []
+        self.observed: list[dict] = []
+        self.observe_status = 204
         self.reply: dict = {"silent": True}
         self.delay = 0.0
+
+    async def handle_observe(self, request: web.Request) -> web.Response:
+        if request.headers.get("Authorization") != f"Bearer {TOKEN}":
+            return web.json_response({"error": "unauthorized"}, status=401)
+        self.observed.append(
+            {"headers": dict(request.headers), "body": await request.json()}
+        )
+        if self.observe_status >= 400:
+            return web.json_response({"error": "boom"}, status=self.observe_status)
+        return web.Response(status=204)
 
     async def handle(self, request: web.Request) -> web.Response:
         if request.headers.get("Authorization") != f"Bearer {TOKEN}":
@@ -67,6 +79,7 @@ async def stub_loagent():
     stub = StubLoAgent()
     app = web.Application()
     app.router.add_post("/api/channel/message", stub.handle)
+    app.router.add_post("/api/channel/observe", stub.handle_observe)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "127.0.0.1", 0)
@@ -131,8 +144,37 @@ def _group_at_bot_payload() -> dict:
     }
 
 
-async def _run_pipeline(stub: StubLoAgent, monkeypatch, *, token=TOKEN, timeout=5.0):
-    """Convert the payload with the adapter and execute the whole pipeline."""
+def _group_plain_payload() -> dict:
+    """OneBot v11 group message that does not wake the bot."""
+    return {
+        "post_type": "message",
+        "message_type": "group",
+        "sub_type": "normal",
+        "message_id": 778,
+        "group_id": GROUP_ID,
+        "self_id": SELF_ID,
+        "user_id": 20002,
+        "time": 1700000200,
+        "sender": {"user_id": 20002, "nickname": "alice", "card": "Alice"},
+        "message": [{"type": "text", "data": {"text": "meeting at 3pm tomorrow"}}],
+    }
+
+
+async def _run_pipeline(
+    stub: StubLoAgent,
+    monkeypatch,
+    *,
+    token=TOKEN,
+    timeout=5.0,
+    payload=None,
+    observe=False,
+    whitelist=None,
+    env=None,
+):
+    """Convert the payload with the adapter and execute the whole pipeline.
+
+    Observe requests run in the background; they are awaited before returning.
+    """
     monkeypatch.setattr(
         SessionServiceManager, "is_session_enabled", AsyncMock(return_value=True)
     )
@@ -148,15 +190,20 @@ async def _run_pipeline(stub: StubLoAgent, monkeypatch, *, token=TOKEN, timeout=
     )
     monkeypatch.delenv("LOAGENT_ENDPOINT", raising=False)
     monkeypatch.delenv("LOAGENT_TOKEN", raising=False)
+    monkeypatch.delenv("LOAGENT_CHANNEL_TOKEN", raising=False)
+    for name, value in (env or {}).items():
+        monkeypatch.setenv(name, value)
 
     config = copy.deepcopy(DEFAULT_CONFIG)
     config.update(
         admins_id=[],
         plugin_set=[],
         loagent_project="persona-a",
+        loagent_observe=observe,
         loagent={"endpoint": stub.endpoint, "token": token, "timeout": timeout},
     )
-    config["platform_settings"]["enable_id_white_list"] = False
+    config["platform_settings"]["enable_id_white_list"] = whitelist is not None
+    config["platform_settings"]["id_whitelist"] = whitelist or []
 
     adapter = _make_adapter()
     star_context = Context(
@@ -172,9 +219,12 @@ async def _run_pipeline(stub: StubLoAgent, monkeypatch, *, token=TOKEN, timeout=
     )
     await scheduler.initialize()
 
-    abm = await adapter.convert_message(Event.from_payload(_group_at_bot_payload()))
+    abm = await adapter.convert_message(
+        Event.from_payload(payload or _group_at_bot_payload())
+    )
     event = adapter.create_event(abm)
     await scheduler.execute(event)
+    await asyncio.gather(*loagent_observe.pending_tasks())
     return adapter
 
 
@@ -342,3 +392,132 @@ async def test_build_request_for_private_message_with_image():
     assert body["mentions"] == {"bot": False, "all": False, "users": []}
     assert body["replyTo"] is None
     assert body["at"] == "1970-01-01T00:00:00+00:00"
+
+
+@pytest.mark.asyncio
+async def test_unwoken_group_message_is_observed_without_reply(
+    stub_loagent, monkeypatch
+):
+    adapter = await _run_pipeline(
+        stub_loagent, monkeypatch, payload=_group_plain_payload(), observe=True
+    )
+
+    assert stub_loagent.requests == []
+    assert len(stub_loagent.observed) == 1
+    observed = stub_loagent.observed[0]
+    assert observed["headers"]["Authorization"] == f"Bearer {TOKEN}"
+    body = observed["body"]
+    assert body["project"] == "persona-a"
+    assert body["umo"] == f"qq_main:GroupMessage:{GROUP_ID}"
+    assert body["messageType"] == "group"
+    assert body["messageId"] == "778"
+    assert body["sender"] == {"id": "20002", "name": "Alice"}
+    assert body["text"] == "meeting at 3pm tomorrow"
+    assert body["mentions"] == {"bot": False, "all": False, "users": []}
+    adapter.bot.send_group_msg.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_observe_is_off_by_default(stub_loagent, monkeypatch):
+    adapter = await _run_pipeline(
+        stub_loagent, monkeypatch, payload=_group_plain_payload()
+    )
+
+    assert stub_loagent.requests == []
+    assert stub_loagent.observed == []
+    adapter.bot.send_group_msg.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_woken_message_is_forwarded_not_observed(stub_loagent, monkeypatch):
+    await _run_pipeline(stub_loagent, monkeypatch, observe=True)
+
+    assert len(stub_loagent.requests) == 1
+    assert stub_loagent.observed == []
+
+
+@pytest.mark.asyncio
+async def test_observe_respects_whitelist(stub_loagent, monkeypatch):
+    await _run_pipeline(
+        stub_loagent,
+        monkeypatch,
+        payload=_group_plain_payload(),
+        observe=True,
+        whitelist=["999999"],
+    )
+    assert stub_loagent.observed == []
+
+    await _run_pipeline(
+        stub_loagent,
+        monkeypatch,
+        payload=_group_plain_payload(),
+        observe=True,
+        whitelist=[str(GROUP_ID)],
+    )
+    assert len(stub_loagent.observed) == 1
+
+
+@pytest.mark.asyncio
+async def test_observe_failure_is_only_logged(stub_loagent, monkeypatch):
+    fake_logger = MagicMock()
+    monkeypatch.setattr(loagent_observe, "logger", fake_logger)
+    stub_loagent.observe_status = 500
+
+    adapter = await _run_pipeline(
+        stub_loagent, monkeypatch, payload=_group_plain_payload(), observe=True
+    )
+
+    assert len(stub_loagent.observed) == 1
+    adapter.bot.send_group_msg.assert_not_awaited()
+    fake_logger.warning.assert_called()
+    assert 500 in fake_logger.warning.call_args.args
+
+
+@pytest.mark.asyncio
+async def test_unreachable_observe_is_only_logged(stub_loagent, monkeypatch):
+    fake_logger = MagicMock()
+    monkeypatch.setattr(loagent_observe, "logger", fake_logger)
+    endpoint = stub_loagent.endpoint
+    stub_loagent.endpoint = "http://127.0.0.1:1"
+
+    await _run_pipeline(
+        stub_loagent, monkeypatch, payload=_group_plain_payload(), observe=True
+    )
+
+    stub_loagent.endpoint = endpoint
+    fake_logger.warning.assert_called()
+    assert "failed" in fake_logger.warning.call_args.args[0]
+
+
+@pytest.mark.asyncio
+async def test_token_falls_back_to_loagent_channel_token(stub_loagent, monkeypatch):
+    await _run_pipeline(
+        stub_loagent,
+        monkeypatch,
+        token="",
+        observe=True,
+        env={"LOAGENT_CHANNEL_TOKEN": TOKEN},
+    )
+    assert len(stub_loagent.requests) == 1
+
+    await _run_pipeline(
+        stub_loagent,
+        monkeypatch,
+        token="",
+        payload=_group_plain_payload(),
+        observe=True,
+        env={"LOAGENT_CHANNEL_TOKEN": TOKEN},
+    )
+    assert len(stub_loagent.observed) == 1
+
+
+def test_loagent_token_env_wins_over_channel_token(monkeypatch):
+    monkeypatch.setenv("LOAGENT_TOKEN", "explicit")
+    monkeypatch.setenv("LOAGENT_CHANNEL_TOKEN", "shared")
+    monkeypatch.delenv("LOAGENT_ENDPOINT", raising=False)
+
+    endpoint, token, timeout = loagent_forward.resolve_loagent_settings(
+        {"loagent": {"endpoint": "http://x:1/", "token": "conf", "timeout": 3}}
+    )
+
+    assert (endpoint, token, timeout) == ("http://x:1", "explicit", 3.0)

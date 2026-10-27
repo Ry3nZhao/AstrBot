@@ -36,6 +36,8 @@ def test_smoke_critical_imports_in_fresh_interpreter() -> None:
         "'astrbot.core.core_lifecycle',"
         "'astrbot.core.pipeline.scheduler',"
         "'astrbot.core.pipeline.process_stage.method.loagent_forward',"
+        "'astrbot.core.pipeline.process_stage.method.loagent_observe',"
+        "'astrbot.core.pipeline.waking_check.stage',"
         "'astrbot.dashboard.server'"
         "];"
         "[importlib.import_module(m) for m in mods]"

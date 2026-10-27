@@ -52,6 +52,37 @@ _MESSAGE_TYPES = {
 }
 
 
+def resolve_loagent_settings(default_conf: dict) -> tuple[str, str, float]:
+    """Resolve the global LoAgent entry point.
+
+    The entry point is global, so it is read from the default configuration.
+    Environment variables take precedence: ``LOAGENT_ENDPOINT`` for the
+    address and ``LOAGENT_TOKEN`` for the token, falling back to
+    ``LOAGENT_CHANNEL_TOKEN`` (the name LoAgent's channel-gateway reads, so one
+    env file can serve both containers).
+
+    Args:
+        default_conf: The default AstrBot configuration.
+
+    Returns:
+        ``(endpoint, token, timeout)``; the endpoint has no trailing slash.
+    """
+    loagent_conf = default_conf.get("loagent") or {}
+    endpoint = (
+        os.environ.get("LOAGENT_ENDPOINT")
+        or loagent_conf.get("endpoint")
+        or DEFAULT_ENDPOINT
+    ).rstrip("/")
+    token = (
+        os.environ.get("LOAGENT_TOKEN")
+        or os.environ.get("LOAGENT_CHANNEL_TOKEN")
+        or loagent_conf.get("token")
+        or ""
+    )
+    timeout = float(loagent_conf.get("timeout") or DEFAULT_TIMEOUT)
+    return endpoint, token, timeout
+
+
 def _chain_text(chain: list[BaseMessageComponent] | None) -> str:
     """Concatenate the plain text segments of a message chain."""
     return "".join(c.text for c in chain or [] if isinstance(c, Plain)).strip()
@@ -181,16 +212,9 @@ class LoAgentForwardSubStage(Stage):
     async def initialize(self, ctx: PipelineContext) -> None:
         self.ctx = ctx
         self.config = ctx.astrbot_config
-        # The entry point is global: read it from the default configuration.
-        default_conf = ctx.plugin_manager.context.get_config()
-        loagent_conf = default_conf.get("loagent") or {}
-        self.endpoint = (
-            os.environ.get("LOAGENT_ENDPOINT")
-            or loagent_conf.get("endpoint")
-            or DEFAULT_ENDPOINT
-        ).rstrip("/")
-        self.token = os.environ.get("LOAGENT_TOKEN") or loagent_conf.get("token") or ""
-        self.timeout = float(loagent_conf.get("timeout") or DEFAULT_TIMEOUT)
+        self.endpoint, self.token, self.timeout = resolve_loagent_settings(
+            ctx.plugin_manager.context.get_config()
+        )
         self.project = str(self.config.get("loagent_project") or "").strip()
 
     async def process(self, event: AstrMessageEvent) -> AsyncGenerator[None, None]:

@@ -12,6 +12,7 @@ from astrbot.core.star.star_handler import EventType, star_handlers_registry
 from astrbot.core.utils.session_waiter import FILTERS, USER_SESSIONS
 
 from ..context import PipelineContext
+from ..process_stage.method.loagent_observe import LoAgentObserver
 from ..stage import Stage, register_stage
 from .umo_auto_name import UmoAutoNameRecorder
 
@@ -59,6 +60,8 @@ class WakingCheckStage(Stage):
             ctx.db_helper,
             ctx.astrbot_config_id,
         )
+        # LoAgent channel gateway: unwoken group messages go to the observe entry.
+        self._loagent_observer = LoAgentObserver(ctx)
 
     async def process(
         self,
@@ -249,4 +252,5 @@ class WakingCheckStage(Stage):
         if is_wake:
             self._umo_auto_name_recorder.schedule(event)
         else:
+            self._loagent_observer.schedule(event)
             event.stop_event()
