@@ -54,59 +54,6 @@ async def test_discord_formats_mentions(message, expected):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("source", ["resolved", "cached", "fetched"])
-async def test_discord_reply_body_reaches_model_request(source):
-    """Verify that Discord reply text reaches the model request.
-
-    Args:
-        source: Where the referenced Discord message is available.
-    """
-    from astrbot.core.astr_main_agent import _process_quote_message
-    from astrbot.core.provider.entities import ProviderRequest
-
-    adapter = DiscordPlatformAdapter.__new__(DiscordPlatformAdapter)
-    adapter.bot_self_id = "1"
-    adapter.client = SimpleNamespace(user=SimpleNamespace(id=1))
-    quoted = Mock(
-        spec=discord.Message,
-        id=41,
-        content="<@1> TEST_CODE 1008",
-        author=SimpleNamespace(id=3, display_name="original sender"),
-    )
-    channel = SimpleNamespace(
-        id=123, guild=None, fetch_message=AsyncMock(return_value=quoted)
-    )
-    message = SimpleNamespace(
-        id=42,
-        type=discord.MessageType.reply,
-        content="<@1> What is the quoted code?",
-        channel=channel,
-        author=SimpleNamespace(id=2, display_name="tester"),
-        attachments=[],
-        reference=SimpleNamespace(
-            message_id=41,
-            resolved=quoted if source == "resolved" else None,
-            cached_message=quoted if source == "cached" else None,
-        ),
-    )
-
-    abm = await adapter.convert_message({"message": message})
-    req = ProviderRequest(prompt=abm.message_str)
-    await _process_quote_message(SimpleNamespace(message_obj=abm), req, "", Mock())
-
-    assert req.prompt == "What is the quoted code?"
-    quoted_text = "\n".join(part.text for part in req.extra_user_content_parts)
-    assert quoted.content in quoted_text
-    assert quoted.author.display_name in quoted_text
-    reply = next(comp for comp in abm.message if isinstance(comp, Reply))
-    assert str(reply.sender_id) == "3"
-    if source == "fetched":
-        channel.fetch_message.assert_awaited_once_with(41)
-    else:
-        channel.fetch_message.assert_not_awaited()
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "case",
     ["deleted", "non_reply", "http_error", "timeout", "disconnect", "cancelled"],

@@ -22,7 +22,6 @@ from .helpers import (
     create_mock_discord_channel,
     create_mock_discord_user,
     create_mock_file,
-    create_mock_llm_response,
     create_mock_message_component,
     create_mock_update,
     make_platform_config,
@@ -60,5 +59,4 @@ __all__ = [
     "create_mock_discord_user",
     "create_mock_discord_channel",
     "create_mock_message_component",
-    "create_mock_llm_response",
 ]

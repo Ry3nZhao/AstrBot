@@ -101,7 +101,7 @@ async def test_session_waiter_pipeline(monkeypatch, private, state):
         current.set_extra("agent_called", True)
         yield
 
-    process.agent_sub_stage = SimpleNamespace(process=agent)
+    process.loagent_sub_stage = SimpleNamespace(process=agent)
     preprocess = AsyncMock(
         side_effect=lambda current: current.set_extra("preprocessed", True)
     )

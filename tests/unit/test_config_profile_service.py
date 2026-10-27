@@ -45,25 +45,8 @@ async def test_profile_mutations_await_config_manager() -> None:
         lifecycle, runtime={"os": "windows", "sandbox": {"status": "unsupported"}}
     )
 
-    with pytest.raises(ValueError, match="Invalid local filesystem scope for member") as exc:
-        await service.create_profile(
-            "Invalid",
-            {
-                "provider_settings": {
-                    "computer_use_runtime": "local",
-                    "computer_use_local_permissions": {
-                        role: {"filesystem_scope": "invalid"}
-                        for role in ("member", "admin")
-                    },
-                }
-            },
-        )
-    assert "Invalid local filesystem scope for admin" in str(exc.value)
-    config_manager.create_conf.assert_not_awaited()
-    lifecycle.reload_pipeline_scheduler.assert_not_awaited()
-
     result = await service.create_profile(
-        "Profile", {"provider_settings": {"computer_use_runtime": "local"}}
+        "Profile", {"provider_settings": {"loagent_project": "demo"}}
     )
     await service.rename_profile("profile-id", "Renamed")
     await service.delete_profile("profile-id")
@@ -71,7 +54,7 @@ async def test_profile_mutations_await_config_manager() -> None:
     assert result == {"conf_id": "profile-id"}
     config_manager.create_conf.assert_awaited_once_with(
         name="Profile",
-        config={"provider_settings": {"computer_use_runtime": "local"}},
+        config={"provider_settings": {"loagent_project": "demo"}},
     )
     lifecycle.reload_pipeline_scheduler.assert_awaited_once_with("profile-id")
     config_manager.update_conf_info.assert_awaited_once_with(

@@ -14,14 +14,12 @@ from astrbot.core.db.po import (
     PlatformStat,
 )
 from astrbot.core.db.sqlite import SQLiteDatabase
-from astrbot.core.db.vec_db.faiss_impl.document_storage import BaseDocModel, Document
-from astrbot.core.knowledge_base.models import BaseKBModel, KnowledgeBase
 
 
 @pytest.mark.parametrize(
     "metadata",
-    [SQLModel.metadata, BaseKBModel.metadata, BaseDocModel.metadata],
-    ids=["main", "knowledge-base", "documents"],
+    [SQLModel.metadata],
+    ids=["main"],
 )
 @pytest.mark.parametrize(
     "value",
@@ -67,10 +65,8 @@ def test_datetime_columns_preserve_wall_time(
     [
         PlatformStat.__table__.c.timestamp,
         ConversationV2.__table__.c.created_at,
-        KnowledgeBase.__table__.c.created_at,
-        Document.__table__.c.created_at,
     ],
-    ids=["statistics", "inherited-timestamp", "knowledge-base", "documents"],
+    ids=["statistics", "inherited-timestamp"],
 )
 def test_existing_datetime_rows_keep_naive_reads_and_filters(
     tmp_path: Path, column: Column

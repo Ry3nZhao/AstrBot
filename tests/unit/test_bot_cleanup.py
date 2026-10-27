@@ -8,8 +8,6 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from sqlmodel import select
 
-from astrbot.core.conversation_mgr import ConversationManager
-from astrbot.core.cron.manager import CronJobManager
 from astrbot.core.db.po import (
     ConversationV2,
     CronJob,
@@ -55,8 +53,6 @@ async def test_cleanup_is_selective_and_matches_exact_platform(
     ids = [bot_id, "BOT_%", "bot_ab", "bot_%-other"]
     core = SimpleNamespace(
         db=temp_db,
-        cron_manager=CronJobManager(temp_db),
-        conversation_manager=ConversationManager(temp_db),
         umop_config_router=UmopConfigRouter(preferences),
         astrbot_config={},
     )
@@ -66,7 +62,6 @@ async def test_cleanup_is_selective_and_matches_exact_platform(
         routes = {"::": "shared", "bot*::": "shared"}
         for platform in ids:
             umo = f"{platform}:GroupMessage:room:with:colons"
-            core.conversation_manager.session_conversations[umo] = platform
             groups["shared"]["umos"].append(umo)
             routes[f"{platform}::"] = "shared"
             records.extend(
@@ -167,9 +162,6 @@ async def test_cleanup_is_selective_and_matches_exact_platform(
             assert (await preferences.session_get(umo, "sel_conv_id")) == (
                 None if pointer_removed else platform
             )
-            assert (
-                umo in core.conversation_manager.session_conversations
-            ) is not pointer_removed
         saved_groups = await preferences.get_async(
             "unknown", "unknown", "session_groups"
         )
@@ -225,34 +217,3 @@ async def test_delete_bot_keeps_config_on_cleanup_failure(monkeypatch):
     save.assert_called_once()
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("run_once", [False, True])
-async def test_delete_scheduled_job_drains_active_run(temp_db, run_once):
-    """Finish cancellation cleanup before deleting a job, including one-shots."""
-    manager = CronJobManager(temp_db)
-    started = asyncio.Event()
-    finished = asyncio.Event()
-
-    async def run(**_payload):
-        try:
-            started.set()
-            await asyncio.Event().wait()
-        finally:
-            await asyncio.sleep(0)
-            finished.set()
-
-    job = await temp_db.create_cron_job(
-        name="test",
-        job_type="basic",
-        cron_expression=None,
-        payload={"session": "bot:FriendMessage:1"},
-        run_once=run_once,
-    )
-    manager._basic_handlers[job.job_id] = run
-    task = asyncio.create_task(manager._run_job(job.job_id))
-    await asyncio.wait_for(started.wait(), 2)
-    await asyncio.wait_for(manager.delete_job(job.job_id), 2)
-    assert task.cancelled()
-    assert finished.is_set()
-    assert await temp_db.get_cron_job(job.job_id) is None
-    assert manager._running_tasks == {}

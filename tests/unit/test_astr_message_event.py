@@ -323,46 +323,6 @@ async def test_public_context_send_skips_unscoped_and_stream_chunk_records(
     )
 
 
-@pytest.mark.asyncio
-async def test_nested_event_forwarding_records_delivery_once(monkeypatch):
-    """Record nested public sends only once without duplicating event metrics."""
-    from astrbot.core.cron.events import CronMessageEvent
-    from astrbot.core.platform.message_session import MessageSession
-
-    monkeypatch.setattr(
-        "astrbot.core.platform.astr_message_event.Metric.upload", AsyncMock()
-    )
-    context = SimpleNamespace(
-        platform_manager=SimpleNamespace(platform_insts=[
-            SimpleNamespace(
-                meta=lambda: SimpleNamespace(id="target"), send_by_session=AsyncMock()
-            )
-        ]),
-        get_config=lambda **kwargs: {},
-    )
-
-    async def send_message(session, chain):
-        """Dispatch through the real public context method."""
-        return await Context.send_message(context, session, chain)
-
-    context.send_message = send_message
-    event = CronMessageEvent(
-        context=context,
-        session=MessageSession.from_str("target:FriendMessage:user"),
-        message="Scheduled",
-    )
-    event.trace = MagicMock()
-    with event_context(event):
-        await event.send(MessageChain([Plain("Hello")]))
-    deliveries = [
-        call for call in event.trace.record.call_args_list
-        if call.args[0] == "response_sent"
-    ]
-    assert len(deliveries) == 1
-    assert deliveries[0].kwargs["message"] == "Hello"
-    assert event._has_send_oper is True
-
-
 def test_retained_attachment_is_excluded_from_event_cleanup(
     astr_message_event, tmp_path
 ):
@@ -903,35 +863,6 @@ class TestShouldCallLlm:
         """Test should_call_llm sets call_llm."""
         astr_message_event.should_call_llm(True)
         assert astr_message_event.call_llm is True
-
-
-class TestRequestLlm:
-    """Tests for request_llm method."""
-
-    def test_request_llm_basic(self, astr_message_event):
-        """Test request_llm creates ProviderRequest."""
-        request = astr_message_event.request_llm(prompt="Hello")
-
-        assert request.prompt == "Hello"
-        assert request.session_id == ""
-        assert request.image_urls == []
-        assert request.contexts == []
-
-    def test_request_llm_with_all_params(self, astr_message_event):
-        """Test request_llm with all parameters."""
-        request = astr_message_event.request_llm(
-            prompt="Hello",
-            session_id="session123",
-            image_urls=["http://example.com/img.jpg"],
-            contexts=[{"role": "user", "content": "Hi"}],
-            system_prompt="You are helpful",
-        )
-
-        assert request.prompt == "Hello"
-        assert request.session_id == "session123"
-        assert request.image_urls == ["http://example.com/img.jpg"]
-        assert request.contexts == [{"role": "user", "content": "Hi"}]
-        assert request.system_prompt == "You are helpful"
 
 
 class TestSendStreaming:

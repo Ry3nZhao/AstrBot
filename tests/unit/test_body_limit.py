@@ -1,6 +1,4 @@
 from astrbot.dashboard.server import _check_body_limit
-from astrbot.dashboard.services.backup_service import CHUNK_SIZE
-from astrbot.dashboard.services.chat_service import MAX_UPLOAD_FILE_SIZE_BYTES
 
 DEFAULT_LIMIT = 128 * 1024 * 1024
 MULTIPART = "multipart/form-data; boundary=----test"
@@ -64,47 +62,6 @@ class TestCheckBodyLimit:
             "/api/v1/config",
             DEFAULT_LIMIT + 1,
             "application/json",
-            default_limit=DEFAULT_LIMIT,
-        )
-        assert result is not None
-        assert result[0] == 413
-
-    def test_exact_limit_file_passes_with_multipart_slack(self):
-        # The /files override includes framing overhead, so a file exactly
-        # at the 512 MiB cap is not rejected, while anything beyond the
-        # slack still is.
-        assert (
-            _check_body_limit(
-                "/api/v1/files",
-                MAX_UPLOAD_FILE_SIZE_BYTES,
-                MULTIPART,
-                default_limit=DEFAULT_LIMIT,
-            )
-            is None
-        )
-        result = _check_body_limit(
-            "/api/v1/files",
-            MAX_UPLOAD_FILE_SIZE_BYTES + 2 * 1024 * 1024,
-            MULTIPART,
-            default_limit=DEFAULT_LIMIT,
-        )
-        assert result is not None
-        assert result[0] == 413
-
-    def test_chunk_route_uses_chunk_limit(self):
-        assert (
-            _check_body_limit(
-                "/api/v1/files/upload/chunk",
-                CHUNK_SIZE * 2,
-                MULTIPART,
-                default_limit=DEFAULT_LIMIT,
-            )
-            is None
-        )
-        result = _check_body_limit(
-            "/api/v1/files/upload/chunk",
-            CHUNK_SIZE * 2 + 1,
-            MULTIPART,
             default_limit=DEFAULT_LIMIT,
         )
         assert result is not None

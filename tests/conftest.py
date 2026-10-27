@@ -265,26 +265,6 @@ def astrbot_config(temp_config_file: Path):
     return config
 
 
-@pytest.fixture
-def main_agent_build_config():
-    """创建 MainAgentBuildConfig 实例。"""
-    from astrbot.core.astr_main_agent import MainAgentBuildConfig
-
-    return MainAgentBuildConfig(
-        tool_call_timeout=60,
-        tool_schema_mode="full",
-        provider_wake_prefix="",
-        streaming_response=True,
-        sanitize_context_by_modalities=False,
-        kb_agentic_mode=False,
-        file_extract_enabled=False,
-        context_limit_reached_strategy="truncate_by_turns",
-        llm_safety_mode=True,
-        computer_use_runtime="local",
-        add_cron_tools=True,
-    )
-
-
 # ============================================================
 # 数据库 Fixtures
 # ============================================================
@@ -313,7 +293,6 @@ async def temp_db(temp_db_file: Path):
 async def mock_context(
     astrbot_config,
     temp_db,
-    mock_provider,
     mock_platform,
 ):
     """创建模拟的插件上下文。"""
@@ -321,62 +300,13 @@ async def mock_context(
 
     from astrbot.core.star.context import Context
 
-    event_queue = Queue()
-
-    provider_manager = MagicMock()
-    provider_manager.get_using_provider = MagicMock(return_value=mock_provider)
-    provider_manager.get_using_provider_async = AsyncMock(
-        side_effect=lambda *args, **kwargs: provider_manager.get_using_provider(
-            *args,
-            **kwargs,
-        )
-    )
-    provider_manager.get_provider_by_id = MagicMock(return_value=mock_provider)
-
-    platform_manager = MagicMock()
-    conversation_manager = MagicMock()
-    message_history_manager = MagicMock()
-    persona_manager = MagicMock()
-    persona_manager.personas_v3 = []
-    astrbot_config_mgr = MagicMock()
-    knowledge_base_manager = MagicMock()
-    cron_manager = MagicMock()
-    subagent_orchestrator = None
-
-    context = Context(
-        event_queue,
+    return Context(
+        Queue(),
         astrbot_config,
         temp_db,
-        provider_manager,
-        platform_manager,
-        conversation_manager,
-        message_history_manager,
-        persona_manager,
-        astrbot_config_mgr,
-        knowledge_base_manager,
-        cron_manager,
-        subagent_orchestrator,
-    )
-
-    return context
-
-
-# ============================================================
-# Provider Request Fixtures
-# ============================================================
-
-
-@pytest.fixture
-def provider_request():
-    """创建 ProviderRequest 实例。"""
-    from astrbot.core.provider.entities import ProviderRequest
-
-    return ProviderRequest(
-        prompt="Hello",
-        session_id="test_session",
-        image_urls=[],
-        contexts=[],
-        system_prompt="You are a helpful assistant.",
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
     )
 
 

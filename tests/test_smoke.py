@@ -7,11 +7,8 @@ import sys
 from pathlib import Path
 
 from astrbot.core.pipeline.bootstrap import ensure_builtin_stages_registered
-from astrbot.core.pipeline.process_stage.method.agent_sub_stages.internal import (
-    InternalAgentSubStage,
-)
-from astrbot.core.pipeline.process_stage.method.agent_sub_stages.third_party import (
-    ThirdPartyAgentSubStage,
+from astrbot.core.pipeline.process_stage.method.loagent_forward import (
+    LoAgentForwardSubStage,
 )
 from astrbot.core.pipeline.stage import Stage, registered_stages
 from astrbot.core.pipeline.stage_order import STAGES_ORDER
@@ -37,10 +34,9 @@ def test_smoke_critical_imports_in_fresh_interpreter() -> None:
         "import importlib;"
         "mods=["
         "'astrbot.core.core_lifecycle',"
-        "'astrbot.core.astr_main_agent',"
         "'astrbot.core.pipeline.scheduler',"
-        "'astrbot.core.pipeline.process_stage.method.agent_sub_stages.internal',"
-        "'astrbot.core.pipeline.process_stage.method.agent_sub_stages.third_party'"
+        "'astrbot.core.pipeline.process_stage.method.loagent_forward',"
+        "'astrbot.dashboard.server'"
         "];"
         "[importlib.import_module(m) for m in mods]"
     )
@@ -55,9 +51,8 @@ def test_smoke_pipeline_stage_registration_matches_order() -> None:
     assert len(stage_names) == len(registered_stages)
 
 
-def test_smoke_agent_sub_stages_are_stage_subclasses() -> None:
-    assert issubclass(InternalAgentSubStage, Stage)
-    assert issubclass(ThirdPartyAgentSubStage, Stage)
+def test_smoke_loagent_forward_is_stage_subclass() -> None:
+    assert issubclass(LoAgentForwardSubStage, Stage)
 
 
 def test_pipeline_package_exports_remain_compatible() -> None:

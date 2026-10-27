@@ -14,7 +14,6 @@ import pytest
 import astrbot.core.utils.media_utils as media_utils
 from astrbot.core.file_token_service import FileTokenService
 from astrbot.core.message.components import File, Image, Record, Video
-from astrbot.core.provider.entities import ProviderRequest
 from astrbot.core.utils.path_util import path_Mapping
 from astrbot.core.utils.tencent_record_helper import wav_to_tencent_silk
 
@@ -762,41 +761,6 @@ def test_describe_media_ref_does_not_include_payload_or_query():
     assert "A" * 64 not in media_utils.describe_media_ref(data_ref)
     assert "token=secret" not in described_url_ref
     assert described_url_ref == "https URL host='example.com' file='image.png' len=47"
-
-
-@pytest.mark.asyncio
-async def test_provider_request_assemble_context_uses_media_resolver(
-    tmp_path, monkeypatch
-):
-    from PIL import Image as PILImage
-
-    monkeypatch.setattr(media_utils, "get_astrbot_temp_path", lambda: str(tmp_path))
-    image_buffer = BytesIO()
-    PILImage.new("RGBA", (1, 1), (255, 0, 0, 255)).save(image_buffer, format="PNG")
-    image_base64 = base64.b64encode(image_buffer.getvalue()).decode()
-    audio_bytes = b"RIFF\x24\x00\x00\x00WAVEfmt " + b"\x00" * 16
-    audio_base64 = base64.b64encode(audio_bytes).decode()
-
-    request = ProviderRequest(
-        prompt="look",
-        image_urls=[f"data:image/png;base64,{image_base64}"],
-        audio_urls=[f"data:audio/wav;base64,{audio_base64}"],
-    )
-
-    context = await request.assemble_context()
-
-    assert context["content"] == [
-        {"type": "text", "text": "look"},
-        {
-            "type": "image_url",
-            "image_url": {"url": f"data:image/png;base64,{image_base64}"},
-        },
-        {
-            "type": "audio_url",
-            "audio_url": {"url": f"data:audio/wav;base64,{audio_base64}"},
-        },
-    ]
-    assert not list(tmp_path.iterdir())
 
 
 @pytest.mark.asyncio

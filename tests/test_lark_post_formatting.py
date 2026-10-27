@@ -5,12 +5,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import pytest_asyncio
 
-from astrbot.core.astr_main_agent import _process_quote_message, collect_initial_request
 from astrbot.core.message.components import Reply
-from astrbot.core.pipeline.process_stage.method.agent_sub_stages import third_party
 from astrbot.core.pipeline.waking_check import stage as waking
 from astrbot.core.platform.sources.lark.lark_adapter import LarkPlatformAdapter
-from astrbot.core.provider.entities import ProviderRequest
 from astrbot.core.star.filter.command import CommandFilter
 from astrbot.core.star.filter.command_group import CommandGroupFilter
 from astrbot.core.utils.quoted_message_parser import extract_quoted_message_text
@@ -112,109 +109,6 @@ async def waking_stage(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("quoted", "title", "wake_prefix", "provider_prefix", "platform", "message_type"),
-    [
-        (False, "Report", "", "", "lark", "post"),
-        (False, "", "", "", "lark", "post"),
-        (False, "", "/", "llm:", "lark", "post"),
-        (True, "Report", "", "", "lark", "post"),
-        (True, "", "", "", "lark", "post"),
-        (False, "", "/", "", "lark", "text"),
-        (False, "", "/", "", "telegram", "text"),
-    ],
-)
-async def test_lark_post_preserves_formatting(
-    quoted,
-    title,
-    wake_prefix,
-    provider_prefix,
-    platform,
-    message_type,
-    monkeypatch,
-    main_agent_build_config,
-    lark_message,
-    waking_stage,
-):
-    content = {
-        "title": title,
-        "content": [
-            [
-                {"tag": "text", "text": "    ABC"},
-                {"tag": "text", "text": "123", "style": ["bold"]},
-                {"tag": "text", "text": ",42"},
-            ],
-            [],
-            [{"tag": "text", "text": "    "}, {"tag": "text", "text": "1.item  "}],
-            [{"tag": "text", "text": "\tsecond\n    third"}],
-            [{"tag": "a", "text": " docs ", "href": "https://example.com"}],
-            [],
-        ],
-    }
-    expected = (
-        (f"{title}\n" if title else "")
-        + "    ABC123,42\n\n    1.item  \n\tsecond\n    third\n docs (https://example.com)\n"
-    )
-    adapter, event, parent = lark_message
-    parent.body.content = json.dumps(content)
-    event.event.message.parent_id = "parent-1" if quoted else None
-    if not quoted and wake_prefix:
-        content["content"][0].insert(
-            0, {"tag": "text", "text": f"  {wake_prefix}  {provider_prefix}"}
-        )
-    event.event.message.content = json.dumps({"text": "Reply"} if quoted else content)
-    event.event.message.message_type = "text" if quoted else "post"
-
-    await adapter.convert_msg(event)
-
-    parsed_event = adapter.commit_event.call_args.args[0]
-    message = parsed_event.message_obj
-    # Exercise the shared pipeline with the same text under each source type.
-    parsed_event.platform_meta.name = platform
-    if not quoted:
-        parsed_event.message_obj.raw_message.message_type = message_type
-    if quoted:
-        reply = message.message[0]
-        assert type(reply) is Reply
-        request = ProviderRequest()
-        await _process_quote_message(parsed_event, request, "", MagicMock())
-        assert request.extra_user_content_parts[0].text == (
-            f"<Quoted Message>\n({reply.sender_nickname}): {expected}\n</Quoted Message>"
-        )
-        # A marker for one reply must not affect another reply on the same event.
-        other_reply = Reply(id="other", message_str="  other  ")
-        assert await extract_quoted_message_text(parsed_event, other_reply) == "other"
-        parsed_event.platform_meta.name = "telegram"
-        assert await extract_quoted_message_text(parsed_event) == expected.strip()
-    else:
-        waking_stage.ctx.astrbot_config["wake_prefix"] = [wake_prefix]
-        main_agent_build_config.provider_wake_prefix = provider_prefix
-        monkeypatch.setattr(
-            "astrbot.core.astr_main_agent._get_session_conv",
-            AsyncMock(return_value=SimpleNamespace(history="[]")),
-        )
-        await waking_stage.process(parsed_event)
-        request, _ = await collect_initial_request(
-            parsed_event, MagicMock(), main_agent_build_config
-        )
-        expected_prompt = (
-            expected
-            if platform == "lark" and message_type == "post"
-            else expected.strip()
-        )
-        assert request.prompt == expected_prompt
-        third_party_stage = third_party.ThirdPartyAgentSubStage()
-        third_party_stage._resolve_persona_custom_error_message = AsyncMock(
-            return_value=None
-        )
-        hook = AsyncMock(return_value=True)
-        monkeypatch.setattr(third_party, "call_event_hook", hook)
-        async for _ in third_party_stage.process(parsed_event, provider_prefix):
-            pass
-        assert hook.await_args.args[2].prompt == expected_prompt
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
     ("content", "expected"),
     [
         ({"title": "Title only", "content": []}, "Title only"),
@@ -231,23 +125,6 @@ async def test_lark_post_title_boundaries(content, expected):
         adapter._build_message_str_from_components(components, preserve_whitespace=True)
         == expected
     )
-
-
-@pytest.mark.asyncio
-async def test_lark_third_party_skips_whitespace_only_prompt(monkeypatch):
-    event = MagicMock()
-    event.get_platform_name.return_value = "lark"
-    event.message_str = "    \n"
-    event.message_obj.message = []
-    hook = AsyncMock(return_value=True)
-    monkeypatch.setattr(third_party, "call_event_hook", hook)
-    stage = third_party.ThirdPartyAgentSubStage()
-    stage._resolve_persona_custom_error_message = AsyncMock(return_value=None)
-
-    async for _ in stage.process(event, ""):
-        pass
-
-    hook.assert_not_awaited()
 
 
 @pytest.mark.asyncio

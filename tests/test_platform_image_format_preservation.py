@@ -12,7 +12,6 @@ from astrbot.api.message_components import Image
 from astrbot.core.platform.sources.mattermost.client import MattermostClient
 from astrbot.core.platform.sources.satori.satori_event import SatoriPlatformEvent
 from astrbot.core.platform.sources.slack.slack_event import SlackMessageEvent
-from astrbot.core.platform.sources.webchat import webchat_event
 
 
 @pytest.mark.asyncio
@@ -49,41 +48,6 @@ async def test_satori_image_data_url_preserves_jpeg_mime_type():
     )
 
     assert result.startswith('<img src="data:image/jpeg;base64,')
-
-
-@pytest.mark.asyncio
-async def test_webchat_image_attachment_uses_detected_extension(tmp_path, monkeypatch):
-    image_buffer = BytesIO()
-    PILImage.new("RGBA", (2, 2), (255, 0, 0, 128)).save(
-        image_buffer,
-        format="PNG",
-    )
-    image_ref = (
-        "data:image/png;base64," + base64.b64encode(image_buffer.getvalue()).decode()
-    )
-    queue = asyncio.Queue()
-
-    async def put_back_queue(_request_id, payload):
-        await queue.put(payload)
-        return True
-
-    monkeypatch.setattr(webchat_event, "attachments_dir", str(tmp_path))
-    monkeypatch.setattr(
-        webchat_event.webchat_queue_mgr,
-        "put_back_queue",
-        put_back_queue,
-    )
-
-    await webchat_event.WebChatMessageEvent._send(
-        "message-1",
-        MessageChain([Image(file=image_ref)]),
-        "webchat!user!conversation-1",
-    )
-
-    payload = await queue.get()
-    filename = payload["data"].removeprefix("[IMAGE]")
-    assert filename.endswith(".png")
-    assert (tmp_path / filename).exists()
 
 
 @pytest.mark.asyncio

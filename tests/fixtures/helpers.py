@@ -314,37 +314,6 @@ def create_mock_message_component(
     return component_class(**kwargs)
 
 
-def create_mock_llm_response(
-    completion_text: str = "Hello! How can I help you?",
-    role: str = "assistant",
-    tools_call_name: list[str] | None = None,
-    tools_call_args: list[dict] | None = None,
-    tools_call_ids: list[str] | None = None,
-):
-    """创建模拟的 LLM 响应。
-
-    Args:
-        completion_text: 完成文本
-        role: 角色
-        tools_call_name: 工具调用名称列表
-        tools_call_args: 工具调用参数列表
-        tools_call_ids: 工具调用 ID 列表
-
-    Returns:
-        LLMResponse: 模拟的 LLM 响应
-    """
-    from astrbot.core.provider.entities import LLMResponse, TokenUsage
-
-    return LLMResponse(
-        role=role,
-        completion_text=completion_text,
-        tools_call_name=tools_call_name or [],
-        tools_call_args=tools_call_args or [],
-        tools_call_ids=tools_call_ids or [],
-        usage=TokenUsage(input_other=10, output=5),
-    )
-
-
 # ============================================================
 # 测试插件辅助函数
 # ============================================================
