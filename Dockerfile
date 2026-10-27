@@ -1,3 +1,24 @@
+# LoAgent gateway build: the dashboard is built from this branch's sources in a
+# separate stage and bundled into the image, so the runtime serves the stripped
+# WebUI instead of downloading the upstream one (see LOAGENT.md, "打包注意").
+FROM node:24-bookworm-slim AS dashboard
+WORKDIR /AstrBot/dashboard
+RUN corepack enable && corepack prepare pnpm@11.28.5 --activate
+ENV CI=true
+COPY dashboard/package.json dashboard/pnpm-lock.yaml dashboard/pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY dashboard/ ./
+# vite.config.ts bundles the text-to-image runtime from the Python package.
+COPY astrbot/core/utils/t2i/template/ /AstrBot/astrbot/core/utils/t2i/template/
+COPY pyproject.toml /AstrBot/pyproject.toml
+# assets/version must match the core version, or the runtime treats the bundle as
+# stale and downloads the upstream WebUI.
+RUN pnpm build \
+    && mkdir -p dist/assets \
+    && sed -n 's/^version = "\(.*\)"$/v\1/p' /AstrBot/pyproject.toml | head -n 1 > dist/assets/version \
+    && test -s dist/assets/version \
+    && test -f dist/index.html
+
 FROM python:3.12-slim
 WORKDIR /AstrBot
 
@@ -22,6 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY . /AstrBot/
+COPY --from=dashboard /AstrBot/dashboard/dist /AstrBot/astrbot/dashboard/dist
 
 # Bootstrap pip from the hash-verified wheel before downloading other packages.
 RUN python -m pip install --no-cache-dir \
