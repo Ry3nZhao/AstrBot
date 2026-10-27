@@ -20,15 +20,8 @@
       :class="{ 'config-workspace__main--readonly': readonly }"
     >
       <template v-for="section in visibleSections" :key="section.key">
-        <AiConfigPanel
-          v-if="section.key === 'ai_group' && tab === section.key"
-          :metadata="section.value.metadata"
-          :config-data="config_data"
-          :search-keyword="searchKeyword"
-        />
-
         <section
-          v-else-if="section.key === 'plugin_group' && tab === section.key"
+          v-if="section.key === 'plugin_group' && tab === section.key"
           class="config-plugin-section"
         >
           <header class="config-standard-section__heading">
@@ -94,14 +87,13 @@
 </template>
 
 <script>
-import AiConfigPanel from '@/components/config/AiConfigPanel.vue';
 import AstrBotConfigV4 from '@/components/shared/AstrBotConfigV4.vue';
 import PluginSetSelector from '@/components/shared/PluginSetSelector.vue';
 import { useModuleI18n } from '@/i18n/composables';
 
-const SECTION_ORDER = ['ai_group', 'platform_group', 'access_group', 'plugin_group', 'ext_group'];
+const SECTION_ORDER = ['loagent_group', 'platform_group', 'access_group', 'plugin_group', 'ext_group'];
 const SECTION_ICONS = {
-  ai_group: 'mdi-auto-fix',
+  loagent_group: 'mdi-robot-happy-outline',
   access_group: 'mdi-account-lock-outline',
   plugin_group: 'mdi-puzzle-outline',
   platform_group: 'mdi-robot-outline',
@@ -111,7 +103,6 @@ const SECTION_ICONS = {
 export default {
   name: 'AstrBotCoreConfigWrapper',
   components: {
-    AiConfigPanel,
     AstrBotConfigV4,
     PluginSetSelector
   },

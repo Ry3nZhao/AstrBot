@@ -4,7 +4,6 @@ import { ref, onMounted, computed, watch } from "vue";
 import VerticalSidebarVue from "./vertical-sidebar/VerticalSidebar.vue";
 import VerticalHeaderVue from "./vertical-header/VerticalHeader.vue";
 import ReadmeDialog from "@/components/shared/ReadmeDialog.vue";
-import Chat from "@/components/chat/Chat.vue";
 import { useCustomizerStore } from "@/stores/customizer";
 import { useRouterLoadingStore } from "@/stores/routerLoading";
 import { useCommonStore } from "@/stores/common";
@@ -20,40 +19,21 @@ const mobileDrawer = useMobileDrawerStore();
 const { locale } = useI18n();
 const route = useRoute();
 const routerLoadingStore = useRouterLoadingStore();
-const isCurrentChatRoute = computed(
-  () => route.path === "/chat" || route.path.startsWith("/chat/"),
-);
 const isPluginViewRoute = computed(
   () => route.path.startsWith("/plugin-view/") || route.path.startsWith("/plugin-page/"),
 );
-const isProviderPageRoute = computed(() => route.path === "/providers");
 const isPlatformPageRoute = computed(() => route.path === "/platforms");
 const isViewportLockedRoute = computed(
   () =>
-    isCurrentChatRoute.value ||
-    isProviderPageRoute.value ||
     isPlatformPageRoute.value ||
     route.path === "/config" ||
     route.path === "/settings",
 );
-const isFullScreenRoute = computed(
-  () => isCurrentChatRoute.value || isPluginViewRoute.value,
-);
-const shouldMountChat = ref(isCurrentChatRoute.value);
-
-const showSidebar = computed(() => !isCurrentChatRoute.value);
+const isFullScreenRoute = computed(() => isPluginViewRoute.value);
 
 const showFirstNoticeDialog = ref(false);
 
-watch(isCurrentChatRoute, (isChatRoute) => {
-  if (isChatRoute) {
-    shouldMountChat.value = true;
-  }
-});
-
-// Temporary mobile drawers must never survive a route transition. Chat stays
-// mounted with v-show, so resetting the shared store here also covers Chat/Bot
-// switches and navigation initiated from inside ChatUI.
+// Temporary mobile drawers must never survive a route transition.
 watch(
   () => route.fullPath,
   () => mobileDrawer.SET(false),
@@ -127,16 +107,14 @@ onMounted(() => {
         top
         style="z-index: 9999; position: absolute; opacity: 0.3"
       />
-      <VerticalSidebarVue v-if="showSidebar" />
+      <VerticalSidebarVue />
       <VerticalHeaderVue />
-      <v-main :class="{ 'chat-main': isCurrentChatRoute }">
+      <v-main>
         <v-container
           fluid
           class="page-wrapper"
           :class="{
-            'chat-mode-container': isCurrentChatRoute,
-            'viewport-locked-container':
-              isProviderPageRoute || isPlatformPageRoute,
+            'viewport-locked-container': isPlatformPageRoute,
             'fullscreen-container': isFullScreenRoute,
           }"
         >
@@ -150,14 +128,7 @@ onMounted(() => {
               position: isPluginViewRoute ? 'relative' : undefined,
             }"
           >
-            <div
-              v-if="shouldMountChat"
-              v-show="isCurrentChatRoute"
-              style="height: 100%; width: 100%; overflow: hidden"
-            >
-              <Chat :active="isCurrentChatRoute" />
-            </div>
-            <RouterView v-if="!isCurrentChatRoute" />
+            <RouterView />
           </div>
         </v-container>
       </v-main>
@@ -172,10 +143,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.chat-main {
-  padding-top: 0 !important;
-}
-
 /* The header takes its own row in the flow, so the content area owns the remaining
    height and scrolls on its own instead of sliding under the header. */
 :global(html),
@@ -249,7 +216,7 @@ onMounted(() => {
   background: transparent;
 }
 
-/* Chat, workspace and plugin pages manage their own internal scrolling. */
+/* Workspace and plugin pages manage their own internal scrolling. */
 .page-content--locked {
   overflow: hidden;
 }
@@ -295,8 +262,7 @@ onMounted(() => {
 
 /* Vuetify paints its own surface behind every list, which would sit on top of the
    translucent sidebar, so keep the navigation lists transparent on macOS. */
-:global(html[data-astrbot-desktop-platform='macos'] .leftSidebar .v-list),
-:global(html[data-astrbot-desktop-platform='macos'] .chat-sidebar .v-list) {
+:global(html[data-astrbot-desktop-platform='macos'] .leftSidebar .v-list) {
   background: transparent !important;
 }
 </style>

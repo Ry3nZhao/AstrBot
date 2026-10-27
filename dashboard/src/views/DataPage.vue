@@ -4,7 +4,6 @@ import { RouterLink, RouterView, useRoute } from "vue-router";
 import {
   ChartNoAxesColumnIncreasing,
   Logs,
-  MessageSquareText,
   Waypoints,
 } from "@lucide/vue";
 import { useI18n } from "@/i18n/composables";
@@ -18,12 +17,6 @@ const tabs = computed(() => [
     label: t("core.navigation.dataTabs.statistics"),
     routeName: "Stats",
     icon: ChartNoAxesColumnIncreasing,
-  },
-  {
-    value: "conversations",
-    label: t("core.navigation.dataTabs.conversations"),
-    routeName: "Conversation",
-    icon: MessageSquareText,
   },
   {
     value: "logs",

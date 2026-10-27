@@ -2,14 +2,12 @@
  * 指令数据管理 Composable
  */
 import { ref, reactive } from 'vue';
-import { commandApi, toolApi } from '@/api/v1';
-import type { CommandItem, CommandSummary, SnackbarState, ToolItem } from '../types';
+import { commandApi } from '@/api/v1';
+import type { CommandItem, CommandSummary, SnackbarState } from '../types';
 
 export function useComponentData() {
   const loading = ref(false);
   const commands = ref<CommandItem[]>([]);
-  const tools = ref<ToolItem[]>([]);
-  const toolsLoading = ref(false);
   const summary = reactive<CommandSummary>({
     disabled: 0,
     conflicts: 0
@@ -52,31 +50,12 @@ export function useComponentData() {
     }
   };
 
-  const fetchTools = async (errorMessage: string) => {
-    toolsLoading.value = true;
-    try {
-      const res = await toolApi.list();
-      if (res.data.status === 'ok') {
-        tools.value = res.data.data || [];
-      } else {
-        toast(res.data.message || errorMessage, 'error');
-      }
-    } catch (err: any) {
-      toast(err?.message || errorMessage, 'error');
-    } finally {
-      toolsLoading.value = false;
-    }
-  };
-
   return {
     loading,
     commands,
-    tools,
-    toolsLoading,
     summary,
     snackbar,
     toast,
-    fetchCommands,
-    fetchTools
+    fetchCommands
   };
 }

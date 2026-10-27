@@ -227,19 +227,6 @@
                         : globalT('core.common.copy') }}
                   </span>
                 </v-tooltip>
-                <v-tooltip location="top">
-                  <template #activator="{ props }">
-                    <RouterLink
-                      v-bind="props"
-                      class="umo-conversation-link"
-                      :to="{ name: 'Conversation', query: { umo: item.umo } }"
-                      :aria-label="t('sessionRanking.openConversation')"
-                    >
-                      <MessageSquareText :size="15" aria-hidden="true" />
-                    </RouterLink>
-                  </template>
-                  <span>{{ t('sessionRanking.openConversation') }}</span>
-                </v-tooltip>
               </div>
               <strong>{{ formatNumber(item.tokens) }}</strong>
             </div>
@@ -254,7 +241,7 @@
 <script setup lang="ts">
 import VueApexCharts from 'vue3-apexcharts'
 import type { ApexOptions } from 'apexcharts'
-import { Check, Copy, MessageCircle, MessageSquareText } from '@lucide/vue'
+import { Check, Copy, MessageCircle } from '@lucide/vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useTheme } from 'vuetify'
@@ -1155,8 +1142,7 @@ onBeforeUnmount(() => {
   overflow-wrap: anywhere;
 }
 
-.umo-copy-button,
-.umo-conversation-link {
+.umo-copy-button {
   align-items: center;
   background: transparent;
   border: 0;
@@ -1173,8 +1159,7 @@ onBeforeUnmount(() => {
   width: 26px;
 }
 
-.umo-copy-button:hover,
-.umo-conversation-link:hover {
+.umo-copy-button:hover {
   background: rgba(var(--v-theme-on-surface), 0.07);
   color: var(--stats-text);
 }

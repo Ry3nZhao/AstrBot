@@ -1,16 +1,11 @@
 import { markRaw, type Component } from 'vue';
 import {
-  BookSearch,
   Bot,
-  Box,
-  Clock3,
   Database,
   Hand,
-  Heart,
   PencilRuler,
   Puzzle,
   SlidersHorizontal,
-  Workflow,
 } from '@lucide/vue';
 
 export interface menu {
@@ -60,11 +55,6 @@ const sidebarItem: menu[] = [
     to: '/platforms',
   },
   {
-    title: 'core.navigation.providers',
-    icon: markRaw(Box),
-    to: '/providers',
-  },
-  {
     title: 'core.navigation.extension',
     icon: markRaw(Puzzle),
     to: '/extension',
@@ -88,26 +78,6 @@ const sidebarItem: menu[] = [
     header: EXTENSION_GROUP_KEY,
     collapsible: true,
     groupToggle: true,
-  },
-  {
-    title: 'core.navigation.persona',
-    icon: markRaw(Heart),
-    to: '/persona'
-  },
-  {
-    title: 'core.navigation.knowledgeBase',
-    icon: markRaw(BookSearch),
-    to: '/knowledge-base',
-  },
-  {
-    title: 'core.navigation.cron',
-    icon: markRaw(Clock3),
-    to: '/cron'
-  },
-  {
-    title: 'core.navigation.subagent',
-    icon: markRaw(Workflow),
-    to: '/subagent'
   },
 ];
 

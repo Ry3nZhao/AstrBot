@@ -74,12 +74,6 @@
                 <v-chip v-if="item.rules.session_plugin_config" size="x-small" color="secondary" variant="outlined">
                   {{ tm('customRules.pluginConfig') }}
                 </v-chip>
-                <v-chip v-if="item.rules.kb_config" size="x-small" color="info" variant="outlined">
-                  {{ tm('customRules.kbConfig') }}
-                </v-chip>
-                <v-chip v-if="hasProviderConfig(item.rules)" size="x-small" color="warning" variant="outlined">
-                  {{ tm('customRules.providerConfig') }}
-                </v-chip>
               </div>
             </template>
 
@@ -124,7 +118,7 @@
         </v-card-title>
         <v-card-text>
           <v-row dense>
-            <v-col cols="12" md="6" lg="3">
+            <v-col cols="12" md="4">
               <v-select
                 v-model="batchScope"
                 :items="batchScopeOptions"
@@ -138,7 +132,7 @@
               >
               </v-select>
             </v-col>
-            <v-col cols="12" md="6" lg="3">
+            <v-col cols="12" md="4">
               <v-select
                 v-model="batchLlmStatus"
                 :items="statusOptions"
@@ -153,28 +147,13 @@
               >
               </v-select>
             </v-col>
-            <v-col cols="12" md="6" lg="3">
+            <v-col cols="12" md="4">
               <v-select
                 v-model="batchTtsStatus"
                 :items="statusOptions"
                 item-title="label"
                 item-value="value"
                 :label="tm('batchOperations.ttsStatus')"
-                hide-details
-                clearable
-                variant="solo-filled"
-                flat
-                density="comfortable"
-              >
-              </v-select>
-            </v-col>
-            <v-col cols="12" md="6" lg="3">
-              <v-select
-                v-model="batchChatProvider"
-                :items="batchChatProviderOptions"
-                item-title="label"
-                item-value="value"
-                :label="tm('batchOperations.chatProvider')"
                 hide-details
                 clearable
                 variant="solo-filled"
@@ -326,92 +305,6 @@
                 </v-btn>
               </div>
 
-              <!-- Provider Config Section -->
-              <div class="d-flex align-center mb-4 mt-4">
-                <h3 class="font-weight-bold mb-0">
-                  {{ tm('ruleEditor.providerConfig.title') }}
-                </h3>
-              </div>
-
-              <v-row dense>
-                <v-col cols="12">
-                  <v-select
-                    v-model="providerConfig.chat_completion"
-                    :items="chatProviderOptions"
-                    item-title="label"
-                    item-value="value"
-                    :label="tm('ruleEditor.providerConfig.chatProvider')"
-                    variant="outlined"
-                    hide-details
-                    class="mb-2"
-                  />
-                </v-col>
-                <v-col cols="12">
-                  <v-select
-                    v-model="providerConfig.speech_to_text"
-                    :items="sttProviderOptions"
-                    item-title="label"
-                    item-value="value"
-                    :label="tm('ruleEditor.providerConfig.sttProvider')"
-                    variant="outlined"
-                    hide-details
-                    :disabled="availableSttProviders.length === 0"
-                    class="mb-2"
-                  />
-                </v-col>
-                <v-col cols="12">
-                  <v-select
-                    v-model="providerConfig.text_to_speech"
-                    :items="ttsProviderOptions"
-                    item-title="label"
-                    item-value="value"
-                    :label="tm('ruleEditor.providerConfig.ttsProvider')"
-                    variant="outlined"
-                    hide-details
-                    :disabled="availableTtsProviders.length === 0"
-                  />
-                </v-col>
-              </v-row>
-
-              <div class="d-flex justify-end mt-4">
-                <v-btn color="primary" variant="tonal" size="small" @click="saveProviderConfig" :loading="saving" prepend-icon="mdi-content-save">
-                  {{ tm('buttons.save') }}
-                </v-btn>
-              </div>
-
-              <!-- Persona Config Section -->
-              <div class="d-flex align-center mb-4 mt-4">
-                <h3 class="font-weight-bold mb-0">
-                  {{ tm('ruleEditor.personaConfig.title') }}
-                </h3>
-              </div>
-
-              <v-row dense>
-                <v-col cols="12">
-                  <v-select
-                    v-model="serviceConfig.persona_id"
-                    :items="personaOptions"
-                    item-title="label"
-                    item-value="value"
-                    :label="tm('ruleEditor.personaConfig.selectPersona')"
-                    variant="outlined"
-                    hide-details
-                    clearable
-                  />
-                </v-col>
-                <v-col cols="12">
-                  <v-alert type="info" variant="tonal" class="mt-2" icon="mdi-information-outline">
-                    {{ tm('ruleEditor.personaConfig.hint') }}
-                  </v-alert>
-                </v-col>
-              </v-row>
-
-              <div class="d-flex justify-end mt-4">
-                <v-btn color="primary" variant="tonal" size="small" @click="saveServiceConfig" :loading="saving" prepend-icon="mdi-content-save">
-                  {{ tm('buttons.save') }}
-                </v-btn>
-              </div>
-
               <!-- Plugin Config Section -->
               <div class="d-flex align-center mb-4 mt-4">
                 <h3 class="font-weight-bold mb-0">
@@ -444,44 +337,6 @@
 
               <div class="d-flex justify-end mt-4">
                 <v-btn color="primary" variant="tonal" size="small" @click="savePluginConfig" :loading="saving" prepend-icon="mdi-content-save">
-                  {{ tm('buttons.save') }}
-                </v-btn>
-              </div>
-
-              <!-- KB Config Section -->
-              <div class="d-flex align-center mb-4 mt-4">
-                <h3 class="font-weight-bold mb-0">
-                  {{ tm('ruleEditor.kbConfig.title') }}
-                </h3>
-              </div>
-
-              <v-row dense>
-                <v-col cols="12">
-                  <v-select
-                    v-model="kbConfig.kb_ids"
-                    :items="kbOptions"
-                    item-title="label"
-                    item-value="value"
-                    :disabled="availableKbs.length === 0"
-                    :label="tm('ruleEditor.kbConfig.selectKbs')"
-                    variant="outlined"
-                    hide-details
-                    multiple
-                    chips
-                    closable-chips
-                    clearable
-                  />
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-text-field v-model.number="kbConfig.top_k" :label="tm('ruleEditor.kbConfig.topK')" variant="outlined" hide-details type="number" min="1" max="20" class="mt-3" />
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-checkbox v-model="kbConfig.enable_rerank" :label="tm('ruleEditor.kbConfig.enableRerank')" color="primary" hide-details class="mt-3" />
-                </v-col>
-              </v-row>
-
-              <div class="d-flex justify-end mt-4">
-                <v-btn color="primary" variant="tonal" size="small" @click="saveKbConfig" :loading="saving" prepend-icon="mdi-content-save">
                   {{ tm('buttons.save') }}
                 </v-btn>
               </div>
@@ -561,8 +416,6 @@ import UmoDisplay from '@/components/shared/UmoDisplay.vue'
 import { useI18n, useModuleI18n } from '@/i18n/composables'
 import { askForConfirmation as askForConfirmationDialog, useConfirmDialog } from '@/utils/confirmDialog'
 
-const FOLLOW_CONFIG_VALUE = '__astrbot_follow_config__'
-
 export default {
   name: 'SessionManagementPage',
   components: {
@@ -595,12 +448,7 @@ export default {
       searchTimeout: null,
 
       // 可用选项
-      availablePersonas: [],
-      availableChatProviders: [],
-      availableSttProviders: [],
-      availableTtsProviders: [],
       availablePlugins: [],
-      availableKbs: [],
 
       // 添加规则
       availableUmoInfoMap: {},
@@ -617,27 +465,12 @@ export default {
         llm_enabled: true,
         tts_enabled: true,
         custom_name: '',
-        persona_id: null,
-      },
-
-      // Provider 配置
-      providerConfig: {
-        chat_completion: FOLLOW_CONFIG_VALUE,
-        speech_to_text: FOLLOW_CONFIG_VALUE,
-        text_to_speech: FOLLOW_CONFIG_VALUE,
       },
 
       // 插件配置
       pluginConfig: {
         enabled_plugins: [],
         disabled_plugins: [],
-      },
-
-      // 知识库配置
-      kbConfig: {
-        kb_ids: [],
-        top_k: 5,
-        enable_rerank: true,
       },
 
       // 删除确认
@@ -657,8 +490,6 @@ export default {
       batchGroupId: null,
       batchLlmStatus: null,
       batchTtsStatus: null,
-      batchChatProvider: null,
-      batchTtsProvider: null,
       batchUpdating: false,
 
       // 分组管理
@@ -710,66 +541,6 @@ export default {
       return this.rulesList
     },
 
-    personaOptions() {
-      return [
-        { label: this.tm('persona.none'), value: null },
-        ...this.availablePersonas.map((p) => ({
-          label: p.name,
-          value: p.name,
-        })),
-      ]
-    },
-
-    chatProviderOptions() {
-      return [
-        { label: this.tm('provider.followConfig'), value: FOLLOW_CONFIG_VALUE },
-        ...this.availableChatProviders.map((p) => ({
-          label: `${p.name} (${p.model})`,
-          value: p.id,
-        })),
-      ]
-    },
-
-    sttProviderOptions() {
-      return [
-        { label: this.tm('provider.followConfig'), value: FOLLOW_CONFIG_VALUE },
-        ...this.availableSttProviders.map((p) => ({
-          label: `${p.name} (${p.model})`,
-          value: p.id,
-        })),
-      ]
-    },
-
-    ttsProviderOptions() {
-      return [
-        { label: this.tm('provider.followConfig'), value: FOLLOW_CONFIG_VALUE },
-        ...this.availableTtsProviders.map((p) => ({
-          label: `${p.name} (${p.model})`,
-          value: p.id,
-        })),
-      ]
-    },
-
-    batchChatProviderOptions() {
-      return [
-        { label: this.tm('provider.followConfig'), value: FOLLOW_CONFIG_VALUE },
-        ...this.availableChatProviders.map((p) => ({
-          label: `${p.name} (${p.model})`,
-          value: p.id,
-        })),
-      ]
-    },
-
-    batchTtsProviderOptions() {
-      return [
-        { label: this.tm('provider.followConfig'), value: FOLLOW_CONFIG_VALUE },
-        ...this.availableTtsProviders.map((p) => ({
-          label: `${p.name} (${p.model})`,
-          value: p.id,
-        })),
-      ]
-    },
-
     pluginOptions() {
       return this.availablePlugins.map((p) => ({
         label: p.display_name || p.name,
@@ -777,12 +548,6 @@ export default {
       }))
     },
 
-    kbOptions() {
-      return this.availableKbs.map((kb) => ({
-        label: `${kb.emoji || '📚'} ${kb.kb_name}`,
-        value: kb.kb_id,
-      }))
-    },
     batchScopeOptions() {
       const options = [
         { label: this.tm('batchOperations.scopeSelected'), value: 'selected' },
@@ -828,7 +593,7 @@ export default {
     },
 
     canApplyBatch() {
-      const hasChanges = this.batchLlmStatus !== null || this.batchTtsStatus !== null || this.batchChatProvider !== null || this.batchTtsProvider !== null
+      const hasChanges = this.batchLlmStatus !== null || this.batchTtsStatus !== null
       if (this.batchScope === 'selected') {
         return hasChanges && this.selectedItems.length > 0
       }
@@ -876,12 +641,7 @@ export default {
           this.rulesList = data.rules
           this.mergeUmoInfos(data.rules)
           this.totalItems = data.total
-          this.availablePersonas = data.available_personas
-          this.availableChatProviders = data.available_chat_providers
-          this.availableSttProviders = data.available_stt_providers
-          this.availableTtsProviders = data.available_tts_providers
           this.availablePlugins = data.available_plugins || []
-          this.availableKbs = data.available_kbs || []
         } else {
           this.showError(response.data.message || this.tm('messages.loadError'))
         }
@@ -907,10 +667,6 @@ export default {
     async refreshData() {
       await this.loadData()
       this.showSuccess(this.tm('messages.refreshSuccess'))
-    },
-
-    hasProviderConfig(rules) {
-      return rules && (rules['provider_perf_chat_completion'] || rules['provider_perf_speech_to_text'] || rules['provider_perf_text_to_speech'])
     },
 
     parseUmoInfo(umo) {
@@ -991,29 +747,14 @@ export default {
         llm_enabled: svcConfig.llm_enabled !== false,
         tts_enabled: svcConfig.tts_enabled !== false,
         custom_name: svcConfig.custom_name || '',
-        persona_id: svcConfig.persona_id || null,
       }
 
-      // 初始化 Provider 配置
-      this.providerConfig = {
-        chat_completion: this.editingRules['provider_perf_chat_completion'] || FOLLOW_CONFIG_VALUE,
-        speech_to_text: this.editingRules['provider_perf_speech_to_text'] || FOLLOW_CONFIG_VALUE,
-        text_to_speech: this.editingRules['provider_perf_text_to_speech'] || FOLLOW_CONFIG_VALUE,
-      }
 
       // 初始化插件配置
       const pluginCfg = this.editingRules.session_plugin_config || {}
       this.pluginConfig = {
         enabled_plugins: pluginCfg.enabled_plugins || [],
         disabled_plugins: pluginCfg.disabled_plugins || [],
-      }
-
-      // 初始化知识库配置
-      const kbCfg = this.editingRules.kb_config || {}
-      this.kbConfig = {
-        kb_ids: kbCfg.kb_ids || [],
-        top_k: kbCfg.top_k ?? 5,
-        enable_rerank: kbCfg.enable_rerank !== false,
       }
 
       this.ruleDialog = true
@@ -1033,7 +774,6 @@ export default {
         const config = { ...this.serviceConfig }
         // 清理空值
         if (!config.custom_name) delete config.custom_name
-        if (config.persona_id === null) delete config.persona_id
 
         const response = await sessionApi.upsertRule({
           umo: this.selectedUmo.umo,
@@ -1059,68 +799,6 @@ export default {
           }
         } else {
           this.showError(response.data.message || this.tm('messages.saveError'))
-        }
-      } catch (error) {
-        this.showError(error.response?.data?.message || this.tm('messages.saveError'))
-      }
-      this.saving = false
-    },
-
-    async saveProviderConfig() {
-      if (!this.selectedUmo) return
-
-      this.saving = true
-      try {
-        const updateTasks = []
-        const deleteTasks = []
-        const providerTypes = ['chat_completion', 'speech_to_text', 'text_to_speech']
-
-        for (const type of providerTypes) {
-          const value = this.providerConfig[type]
-          if (value && value !== FOLLOW_CONFIG_VALUE) {
-            // 有值时更新
-            updateTasks.push(
-              sessionApi.upsertRule({
-                umo: this.selectedUmo.umo,
-                rule_key: `provider_perf_${type}`,
-                rule_value: value,
-              }),
-            )
-          } else if (this.editingRules[`provider_perf_${type}`]) {
-            // 选择了"跟随配置文件" (__astrbot_follow_config__) 且之前有配置，则删除
-            deleteTasks.push(
-              sessionApi.deleteRules({
-                umo: this.selectedUmo.umo,
-                rule_key: `provider_perf_${type}`,
-              }),
-            )
-          }
-        }
-
-        const allTasks = [...updateTasks, ...deleteTasks]
-        if (allTasks.length > 0) {
-          await Promise.all(allTasks)
-          this.showSuccess(this.tm('messages.saveSuccess'))
-
-          // 更新或添加到列表
-          let item = this.rulesList.find((u) => u.umo === this.selectedUmo.umo)
-          if (!item) {
-            item = this.buildUmoItem(this.selectedUmo.umo)
-            this.rulesList.push(item)
-          }
-          for (const type of providerTypes) {
-            const val = this.providerConfig[type]
-            if (val && val !== FOLLOW_CONFIG_VALUE) {
-              item.rules[`provider_perf_${type}`] = val
-              this.editingRules[`provider_perf_${type}`] = val
-            } else {
-              // 删除本地数据
-              delete item.rules[`provider_perf_${type}`]
-              delete this.editingRules[`provider_perf_${type}`]
-            }
-          }
-        } else {
-          this.showSuccess(this.tm('messages.noChanges'))
         }
       } catch (error) {
         this.showError(error.response?.data?.message || this.tm('messages.saveError'))
@@ -1168,60 +846,6 @@ export default {
               this.rulesList.push(
                 this.buildUmoItem(this.selectedUmo.umo, {
                   session_plugin_config: config,
-                }),
-              )
-            }
-          } else {
-            this.showError(response.data.message || this.tm('messages.saveError'))
-          }
-        }
-      } catch (error) {
-        this.showError(error.response?.data?.message || this.tm('messages.saveError'))
-      }
-      this.saving = false
-    },
-
-    async saveKbConfig() {
-      if (!this.selectedUmo) return
-
-      this.saving = true
-      try {
-        const config = {
-          kb_ids: this.kbConfig.kb_ids,
-          top_k: this.kbConfig.top_k,
-          enable_rerank: this.kbConfig.enable_rerank,
-        }
-
-        // 如果 kb_ids 为空，删除配置
-        if (config.kb_ids.length === 0) {
-          if (this.editingRules.kb_config) {
-            await sessionApi.deleteRules({
-              umo: this.selectedUmo.umo,
-              rule_key: 'kb_config',
-            })
-            delete this.editingRules.kb_config
-            let item = this.rulesList.find((u) => u.umo === this.selectedUmo.umo)
-            if (item) delete item.rules.kb_config
-          }
-          this.showSuccess(this.tm('messages.saveSuccess'))
-        } else {
-          const response = await sessionApi.upsertRule({
-            umo: this.selectedUmo.umo,
-            rule_key: 'kb_config',
-            rule_value: config,
-          })
-
-          if (response.data.status === 'ok') {
-            this.showSuccess(this.tm('messages.saveSuccess'))
-            this.editingRules.kb_config = config
-
-            let item = this.rulesList.find((u) => u.umo === this.selectedUmo.umo)
-            if (item) {
-              item.rules.kb_config = config
-            } else {
-              this.rulesList.push(
-                this.buildUmoItem(this.selectedUmo.umo, {
-                  kb_config: config,
                 }),
               )
             }
@@ -1409,52 +1033,6 @@ export default {
           tasks.push(sessionApi.batchUpdateService(serviceData))
         }
 
-        if (this.batchChatProvider !== null) {
-          if (this.batchChatProvider === FOLLOW_CONFIG_VALUE) {
-            tasks.push(
-              sessionApi.deleteRules({
-                scope,
-                umos,
-                group_id: groupId,
-                rule_key: 'provider_perf_chat_completion',
-              }),
-            )
-          } else {
-            tasks.push(
-              sessionApi.batchUpdateProvider({
-                scope,
-                umos,
-                group_id: groupId,
-                provider_type: 'chat_completion',
-                provider_id: this.batchChatProvider,
-              }),
-            )
-          }
-        }
-
-        if (this.batchTtsProvider !== null) {
-          if (this.batchTtsProvider === FOLLOW_CONFIG_VALUE) {
-            tasks.push(
-              sessionApi.deleteRules({
-                scope,
-                umos,
-                group_id: groupId,
-                rule_key: 'provider_perf_text_to_speech',
-              }),
-            )
-          } else {
-            tasks.push(
-              sessionApi.batchUpdateProvider({
-                scope,
-                umos,
-                group_id: groupId,
-                provider_type: 'text_to_speech',
-                provider_id: this.batchTtsProvider,
-              }),
-            )
-          }
-        }
-
         if (tasks.length === 0) {
           this.showError(this.tm('messages.selectAtLeastOneConfig'))
           this.batchUpdating = false
@@ -1468,8 +1046,6 @@ export default {
           this.showSuccess(this.tm('messages.batchUpdateSuccess'))
           this.batchLlmStatus = null
           this.batchTtsStatus = null
-          this.batchChatProvider = null
-          this.batchTtsProvider = null
           await this.loadData()
         } else {
           this.showError(this.tm('messages.partialUpdateFailed'))

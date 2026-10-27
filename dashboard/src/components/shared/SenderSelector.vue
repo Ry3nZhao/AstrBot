@@ -248,7 +248,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import { conversationApi, sessionApi } from "@/api/v1";
+import { botApi, sessionApi } from "@/api/v1";
 import { useI18n } from "@/i18n/composables";
 import PlatformLogo from "./PlatformLogo.vue";
 import HoverCopyButton from "./HoverCopyButton.vue";
@@ -286,10 +286,10 @@ watch(dialog, async (opened, _previous, onCleanup) => {
     active = false;
   });
   try {
-    const response = await conversationApi.filterOptions();
+    const response = await botApi.list();
     if (active && response.data.status === "ok") {
       botTypes.value = Object.fromEntries(
-        (response.data.data?.bots || []).map((bot) => [bot.id, bot.type]),
+        (response.data.data?.bots || []).map((bot) => [String(bot.id), String(bot.type)]),
       );
     }
   } catch {

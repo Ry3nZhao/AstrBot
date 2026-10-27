@@ -2,7 +2,6 @@ import { defineStore } from 'pinia';
 import { router } from '@/router';
 import {
   authApi,
-  providerApi,
   systemConfigApi,
   UPGRADE_RECOVERY_EVENT,
   UPGRADE_RECOVERY_TOKEN_KEY,
@@ -10,7 +9,6 @@ import {
   type VersionData,
 } from '@/api/v1';
 import { httpClient } from '@/api/http';
-import { useProviderModelSelection } from '@/composables/useProviderModelSelection';
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -144,29 +142,10 @@ export const useAuthStore = defineStore("auth", {
     },
     async checkOnboardingCompleted(): Promise<boolean> {
       try {
-        // 1. 检查平台配置
+        // Onboarding is complete once at least one platform is configured.
         const platformRes = await systemConfigApi.get();
         const systemConfig = (platformRes.data.data as any).config || {};
-        const hasPlatform = (systemConfig.platform || []).length > 0;
-        if (!hasPlatform) return false;
-
-        // 2. 检查提供者配置
-        const providerRes = await providerApi.schema();
-        const providers = providerRes.data.data?.providers || [];
-        const sources = providerRes.data.data?.provider_sources || [];
-        const sourceMap = new Map();
-        sources.forEach((s: any) => sourceMap.set(s.id, s.provider_type));
-        
-        const hasProvider = providers.some((provider: any) => {
-          if (provider.provider_type) return provider.provider_type === 'chat_completion';
-          if (provider.provider_source_id) {
-            const type = sourceMap.get(provider.provider_source_id);
-            if (type === 'chat_completion') return true;
-          }
-          return String(provider.type || '').includes('chat_completion');
-        });
-
-        return hasProvider;
+        return (systemConfig.platform || []).length > 0;
       } catch (e) {
         console.error('Failed to check onboarding status:', e);
         return false;
@@ -174,19 +153,12 @@ export const useAuthStore = defineStore("auth", {
     },
     logout() {
       this.username = '';
-      useProviderModelSelection().setSelection('');
       try {
         localStorage.removeItem('user');
         localStorage.removeItem('token');
         localStorage.removeItem('change_pwd_hint');
         localStorage.removeItem('md5_pwd_hint');
         localStorage.removeItem('password_upgrade_required');
-        for (let index = localStorage.length - 1; index >= 0; index--) {
-          const key = localStorage.key(index);
-          if (key?.startsWith('chat.sessionProvider.')) {
-            localStorage.removeItem(key);
-          }
-        }
       } catch {
         // Storage availability must not prevent logout or the in-memory reset.
       }

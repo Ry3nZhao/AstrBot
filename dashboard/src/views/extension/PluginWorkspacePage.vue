@@ -14,18 +14,6 @@ const tabs = computed(() => [
     routeName: "Extensions",
   },
   {
-    value: "skills",
-    label: t("core.navigation.extensionTabs.skills"),
-    icon: "mdi-lightning-bolt-outline",
-    routeName: "ExtensionSkills",
-  },
-  {
-    value: "mcp",
-    label: t("core.navigation.extensionTabs.mcp"),
-    icon: "mdi-server-network",
-    routeName: "ExtensionMcp",
-  },
-  {
     value: "components",
     label: t("core.navigation.extensionTabs.components"),
     icon: "mdi-wrench-outline",

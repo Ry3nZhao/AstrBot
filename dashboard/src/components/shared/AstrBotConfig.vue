@@ -4,10 +4,8 @@ import { ref, computed } from 'vue'
 import ConfigItemRenderer from './ConfigItemRenderer.vue'
 import ConfigDefaultReset from './ConfigDefaultReset.vue'
 import TemplateListEditor from './TemplateListEditor.vue'
-import { useI18n, useModuleI18n } from '@/i18n/composables'
+import { useI18n } from '@/i18n/composables'
 import { useConfigTextResolver } from '@/composables/useConfigTextResolver'
-import { useToast } from '@/utils/toast'
-import { providerApi } from '@/api/v1'
 
 const props = defineProps({
   metadata: {
@@ -49,7 +47,6 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
-const { getRaw } = useModuleI18n('features/config-metadata')
 const { translateIfKey, resolveConfigText } = useConfigTextResolver(props)
 const currentConfigPath = computed(() => props.pathPrefix || props.metadataKey)
 
@@ -61,44 +58,16 @@ const filteredIterable = computed(() => {
 
 const providerHint = computed(() => {
   const hint = props.iterable?.hint
-  if (typeof hint !== 'string' || !hint) return ''
-
-  if (
-    hint === 'provider_group.provider.openai_embedding.hint'
-    || hint === 'provider_group.provider.gemini_embedding.hint'
-  ) {
-    return ''
-  }
-
-  return hint
+  return typeof hint === 'string' ? hint : ''
 })
 
-const getItemHint = (itemKey, itemMeta) => {
-  if (itemMeta?.hint) return itemMeta.hint
-
-  if (itemKey !== 'embedding_api_base') return ''
-
-  const providerType = props.iterable?.type
-  if (providerType === 'openai_embedding') {
-    return getRaw('provider_group.provider.openai_embedding.hint')
-      ? 'provider_group.provider.openai_embedding.hint'
-      : ''
-  }
-  if (providerType === 'gemini_embedding') {
-    return getRaw('provider_group.provider.gemini_embedding.hint')
-      ? 'provider_group.provider.gemini_embedding.hint'
-      : ''
-  }
-
-  return ''
-}
+const getItemHint = (itemKey, itemMeta) => itemMeta?.hint || ''
 
 const dialog = ref(false)
 const currentEditingKey = ref('')
 const currentEditingLanguage = ref('json')
 const currentEditingTheme = ref('vs-light')
 let currentEditingKeyIterable = null
-const loadingEmbeddingDim = ref(false)
 
 function openEditorDialog(key, value, theme, language) {
   currentEditingKey.value = key
@@ -111,32 +80,6 @@ function openEditorDialog(key, value, theme, language) {
 
 function saveEditedContent() {
   dialog.value = false
-}
-
-async function getEmbeddingDimensions(providerConfig) {
-  if (loadingEmbeddingDim.value) return
-  
-  loadingEmbeddingDim.value = true
-  try {
-    const providerId = String(providerConfig?.id || '')
-    if (!providerId) {
-      useToast().error('缺少提供商 ID')
-      return
-    }
-    const response = await providerApi.embeddingDimension(providerId, providerConfig)
-    
-    if (response.data.status != "error" && response.data.data?.embedding_dimensions) {
-      console.log(response.data.data.embedding_dimensions)
-      providerConfig.embedding_dimensions = response.data.data.embedding_dimensions
-      useToast().success("获取成功: " + response.data.data.embedding_dimensions)
-    } else {
-      useToast().error(response.data.message)
-    }
-  } catch (error) {
-    console.error('Error getting embedding dimensions:', error)
-  } finally {
-    loadingEmbeddingDim.value = false
-  }
 }
 
 function getValueBySelector(obj, selector) {
@@ -309,9 +252,7 @@ function hasVisibleItemsAfter(items, currentIndex) {
                   :plugin-name="pluginName"
                   :plugin-i18n="pluginI18n"
                   :config-key="getItemPath(key)"
-                  :loading="loadingEmbeddingDim"
                   :show-fullscreen-btn="!!metadata[metadataKey].items[key]?.editor_mode"
-                  @get-embedding-dim="getEmbeddingDimensions(iterable)"
                   @open-fullscreen="openEditorDialog(key, iterable, metadata[metadataKey].items[key]?.editor_theme, metadata[metadataKey].items[key]?.editor_language)"
                 />
               </ConfigDefaultReset>

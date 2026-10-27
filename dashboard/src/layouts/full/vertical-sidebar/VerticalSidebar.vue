@@ -8,7 +8,7 @@ import NavItem from './NavItem.vue';
 import { usePluginSidebarItems } from '@/composables/usePluginSidebarItems';
 import { useDisplay } from 'vuetify';
 import { ChevronDown, ChevronRight, PanelLeft, Settings } from '@lucide/vue';
-import ChatUILogo from '@/components/chat/ChatUILogo.vue';
+import BrandLogo from '@/components/shared/BrandLogo.vue';
 import { useCommonStore } from '@/stores/common';
 
 const { t } = useI18n();
@@ -213,7 +213,7 @@ function toggleSidebar() {
     <div class="sidebar-container">
       <div class="dashboard-sidebar-brand" :class="{ collapsed: isRailSidebar }" data-tauri-drag-region>
         <div v-if="!isRailSidebar" class="dashboard-sidebar-brand-title Outfit">
-          <ChatUILogo class="dashboard-sidebar-brand-logo" />
+          <BrandLogo class="dashboard-sidebar-brand-logo" />
           <span class="dashboard-sidebar-brand-copy">
             <span class="dashboard-sidebar-brand-name">AstrBot</span>
           </span>
@@ -226,7 +226,7 @@ function toggleSidebar() {
           @click.stop="toggleSidebar"
         >
           <span class="dashboard-sidebar-rail-icon-stack">
-            <ChatUILogo class="dashboard-sidebar-brand-logo dashboard-sidebar-brand-logo--collapsed" />
+            <BrandLogo class="dashboard-sidebar-brand-logo dashboard-sidebar-brand-logo--collapsed" />
             <PanelLeft :size="20" class="dashboard-sidebar-panel-toggle-icon" />
           </span>
         </button>

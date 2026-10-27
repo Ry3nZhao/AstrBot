@@ -16,36 +16,6 @@
         @update:model-value="emitUpdate"
       />
     </template>
-    <template v-else-if="itemMeta?._special === 'select_provider'">
-      <ProviderSelector :model-value="modelValue" @update:model-value="emitUpdate" :provider-type="'chat_completion'" />
-    </template>
-    <template v-else-if="itemMeta?._special === 'select_provider_stt'">
-      <ProviderSelector :model-value="modelValue" @update:model-value="emitUpdate" :provider-type="'speech_to_text'" />
-    </template>
-    <template v-else-if="itemMeta?._special === 'select_provider_tts'">
-      <ProviderSelector :model-value="modelValue" @update:model-value="emitUpdate" :provider-type="'text_to_speech'" />
-    </template>
-    <template v-else-if="itemMeta?._special === 'select_providers'">
-      <ProviderSelector
-        :model-value="modelValue"
-        @update:model-value="emitUpdate"
-        :provider-type="'chat_completion'"
-        :multiple="true"
-      />
-    </template>
-    <template v-else-if="itemMeta?._special === 'provider_pool'">
-      <ProviderSelector :model-value="modelValue" @update:model-value="emitUpdate" :provider-type="'chat_completion'"
-        :button-text="t('core.shared.providerSelector.selectProviderPool')" />
-    </template>
-    <template v-else-if="itemMeta?._special === 'select_persona'">
-      <PersonaSelector :model-value="modelValue" @update:model-value="emitUpdate" />
-    </template>
-    <template v-else-if="itemMeta?._special === 'persona_pool'">
-      <PersonaSelector :model-value="modelValue" @update:model-value="emitUpdate" :button-text="t('core.shared.personaSelector.selectPersonaPool')" />
-    </template>
-    <template v-else-if="itemMeta?._special === 'select_knowledgebase'">
-      <KnowledgeBaseSelector :model-value="modelValue" @update:model-value="emitUpdate" />
-    </template>
     <template v-else-if="itemMeta?._special === 'select_plugin_set'">
       <PluginSetSelector :model-value="modelValue" @update:model-value="emitUpdate" />
     </template>
@@ -58,35 +28,6 @@
         :config-root="configRoot"
         @update:model-value="emitUpdate"
       />
-    </template>
-    <template v-else-if="itemMeta?._special === 'local_permission_matrix'">
-      <LocalPermissionMatrix
-        :model-value="modelValue"
-        @update:model-value="emitUpdate"
-      />
-    </template>
-    <template v-else-if="itemMeta?._special === 'get_embedding_dim'">
-      <div class="d-flex align-center gap-2">
-        <v-text-field
-          :model-value="modelValue"
-          @update:model-value="emitUpdate"
-          density="compact"
-          variant="outlined"
-          class="config-field"
-          type="number"
-          hide-details
-        ></v-text-field>
-        <v-btn
-          color="primary"
-          variant="tonal"
-          size="small"
-          @click="$emit('get-embedding-dim')"
-          :loading="loading"
-          class="ml-2"
-        >
-          {{ t('core.common.autoDetect') }}
-        </v-btn>
-      </div>
     </template>
 
     <div
@@ -273,13 +214,9 @@ import SenderSelector from './SenderSelector.vue'
 import UmoSelector from './UmoSelector.vue'
 import FileConfigItem from './FileConfigItem.vue'
 import ObjectEditor from './ObjectEditor.vue'
-import ProviderSelector from './ProviderSelector.vue'
-import PersonaSelector from './PersonaSelector.vue'
-import KnowledgeBaseSelector from './KnowledgeBaseSelector.vue'
 import PluginSetSelector from './PluginSetSelector.vue'
 import T2ITemplateEditor from './T2ITemplateEditor.vue'
 import DashboardTotpManager from './DashboardTotpManager.vue'
-import LocalPermissionMatrix from './LocalPermissionMatrix.vue'
 import { computed, ref } from 'vue'
 import { useI18n, useModuleI18n } from '@/i18n/composables'
 import { usePluginI18n } from '@/utils/pluginI18n'
@@ -309,10 +246,6 @@ const props = defineProps({
     type: String,
     default: ''
   },
-  loading: {
-    type: Boolean,
-    default: false
-  },
   showFullscreenBtn: {
     type: Boolean,
     default: false
@@ -323,22 +256,13 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'get-embedding-dim', 'open-fullscreen'])
+const emit = defineEmits(['update:modelValue', 'open-fullscreen'])
 const { t } = useI18n()
 const { getRaw } = useModuleI18n('features/config-metadata')
 const { configText } = usePluginI18n()
 
 async function emitUpdate(val) {
   val = validateNumericConfig(props.itemMeta?.type, val)
-  if (
-    props.itemMeta?._special === 'agent_runner_type'
-    && props.configRoot?.agent_runner
-    && props.itemMeta?.runner_defaults?.[val]
-  ) {
-    props.configRoot.agent_runner.config = JSON.parse(
-      JSON.stringify(props.itemMeta.runner_defaults[val])
-    )
-  }
   emit('update:modelValue', val)
 
 }

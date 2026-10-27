@@ -69,7 +69,7 @@ export const useExtensionPage = (initialTab = "installed") => {
   };
 
   const fileInput = ref(null);
-  const validTabs = ["installed", "market", "mcp", "skills", "components"];
+  const validTabs = ["installed", "market", "components"];
   const activeTab = ref(
     validTabs.includes(initialTab) ? initialTab : "installed",
   );
