@@ -1,6 +1,6 @@
 """Astrbot 核心生命周期管理类, 负责管理 AstrBot 的启动、停止、重启等操作.
 
-该类负责初始化各个组件, 包括 ProviderManager、PlatformManager、ConversationManager、PluginManager、PipelineScheduler、EventBus等。
+该类负责初始化各个组件, 包括 PlatformManager、PluginManager、PipelineScheduler、EventBus等。
 该类还负责加载和执行插件, 以及处理事件总线的分发。
 
 工作流程:
@@ -19,28 +19,20 @@ from asyncio import Queue
 from astrbot.api import logger, sp
 from astrbot.core import LogBroker, LogManager
 from astrbot.core.astrbot_config_mgr import AstrBotConfigManager
-from astrbot.core.computer.computer_client import shutdown_local_booter
 from astrbot.core.config.default import VERSION
-from astrbot.core.conversation_mgr import ConversationManager
-from astrbot.core.cron import CronJobManager
 from astrbot.core.db import BaseDatabase
-from astrbot.core.knowledge_base.kb_mgr import KnowledgeBaseManager
-from astrbot.core.persona_mgr import PersonaManager
 from astrbot.core.pipeline.scheduler import PipelineContext, PipelineScheduler
 from astrbot.core.platform.manager import PlatformManager
 from astrbot.core.platform_message_history_mgr import PlatformMessageHistoryManager
 from astrbot.core.process_restart import restart_process
-from astrbot.core.provider.manager import ProviderManager
 from astrbot.core.star.context import Context
 from astrbot.core.star.star_handler import EventType, star_handlers_registry, star_map
 from astrbot.core.star.star_manager import PluginManager
-from astrbot.core.subagent_orchestrator import SubAgentOrchestrator
 from astrbot.core.umop_config_router import UmopConfigRouter
 from astrbot.core.updater import AstrBotUpdater
 from astrbot.core.utils.event_loop_diagnostics import (
     create_event_loop_diagnostic_tasks,
 )
-from astrbot.core.utils.llm_metadata import update_llm_metadata
 from astrbot.core.utils.migra_helper import migra
 from astrbot.core.utils.temp_dir_cleaner import TempDirCleaner
 
@@ -51,7 +43,7 @@ from .event_bus import EventBus
 class AstrBotCoreLifecycle:
     """AstrBot 核心生命周期管理类, 负责管理 AstrBot 的启动、停止、重启等操作.
 
-    该类负责初始化各个组件, 包括 ProviderManager、PlatformManager、ConversationManager、PluginManager、PipelineScheduler、
+    该类负责初始化各个组件, 包括 PlatformManager、PluginManager、PipelineScheduler、
     EventBus 等。
     该类还负责加载和执行插件, 以及处理事件总线的分发。
     """
@@ -61,10 +53,7 @@ class AstrBotCoreLifecycle:
         self.astrbot_config = astrbot_config  # 初始化配置
         self.db = db  # 初始化数据库
 
-        self.subagent_orchestrator: SubAgentOrchestrator | None = None
-        self.cron_manager: CronJobManager | None = None
         self.temp_dir_cleaner: TempDirCleaner | None = None
-        self._default_chat_provider_warning_emitted = False
 
         # 设置代理
         proxy_config = self.astrbot_config.get("http_proxy", "")
@@ -96,68 +85,10 @@ class AstrBotCoreLifecycle:
             os.environ["no_proxy"] = "localhost,127.0.0.1,::1"
             logger.debug("HTTP proxy cleared, no_proxy set to localhost")
 
-    async def _init_or_reload_subagent_orchestrator(self) -> None:
-        """Create (if needed) and reload the subagent orchestrator from config.
-
-        This keeps lifecycle wiring in one place while allowing the orchestrator
-        to manage enable/disable and tool registration details.
-        """
-        try:
-            if self.subagent_orchestrator is None:
-                self.subagent_orchestrator = SubAgentOrchestrator(
-                    self.provider_manager.llm_tools,
-                    self.persona_mgr,
-                )
-            await self.subagent_orchestrator.reload_from_config(
-                self.astrbot_config.get("subagent_orchestrator", {}),
-            )
-        except Exception as e:
-            logger.error(f"Subagent orchestrator init failed: {e}", exc_info=True)
-
-    def _warn_about_unset_default_chat_provider(self) -> None:
-        if self._default_chat_provider_warning_emitted:
-            return
-
-        pm = getattr(self, "provider_manager", None)
-        if not pm:
-            return
-
-        providers = pm.provider_insts
-        if len(providers) == 0:
-            return
-
-        default_id = getattr(pm, "default_chat_provider_id", "")
-        fallback = pm.curr_provider_inst or providers[0]
-        fallback_id = fallback.provider_config.get("id") or "unknown"
-
-        if not default_id:
-            if len(providers) <= 1:
-                return
-            self._default_chat_provider_warning_emitted = True
-            logger.warning(
-                "Detected %d enabled chat providers but `agent_runner.config.model.provider_id` is empty. "
-                "AstrBot will use `%s` as the startup fallback chat provider. "
-                "Set a default chat model in the WebUI configuration page to avoid unexpected provider switching.",
-                len(providers),
-                fallback_id,
-            )
-            return
-
-        found = any((p.provider_config.get("id") == default_id) for p in providers)
-        if not found:
-            self._default_chat_provider_warning_emitted = True
-            logger.warning(
-                "Configured Agent Runner model provider ID `%s` does not match an enabled provider. "
-                "AstrBot will use `%s` as the fallback chat provider. "
-                "Please check the WebUI configuration page.",
-                default_id,
-                fallback_id,
-            )
-
     async def initialize(self) -> None:
         """初始化 AstrBot 核心生命周期管理类.
 
-        负责初始化各个组件, 包括 ProviderManager、PlatformManager、ConversationManager、PluginManager、PipelineScheduler、EventBus、AstrBotUpdater等。
+        负责初始化各个组件, 包括 PlatformManager、PluginManager、PipelineScheduler、EventBus、AstrBotUpdater等。
         """
         # 初始化日志代理
         logger.info("AstrBot v" + VERSION)
@@ -207,49 +138,20 @@ class AstrBotCoreLifecycle:
         # 初始化事件队列
         self.event_queue = Queue()
 
-        # 初始化人格管理器
-        self.persona_mgr = PersonaManager(self.db, self.astrbot_config_mgr)
-        await self.persona_mgr.initialize()
-
-        # 初始化供应商管理器
-        self.provider_manager = ProviderManager(
-            self.astrbot_config_mgr,
-            self.db,
-            self.persona_mgr,
-        )
-
         # 初始化平台管理器
         self.platform_manager = PlatformManager(self.astrbot_config, self.event_queue)
 
-        # 初始化对话管理器
-        self.conversation_manager = ConversationManager(self.db)
-
         # 初始化平台消息历史管理器
         self.platform_message_history_manager = PlatformMessageHistoryManager(self.db)
-
-        # 初始化知识库管理器
-        self.kb_manager = KnowledgeBaseManager(self.provider_manager)
-
-        # 初始化 CronJob 管理器
-        self.cron_manager = CronJobManager(self.db)
-
-        # Dynamic subagents (handoff tools) from config.
-        await self._init_or_reload_subagent_orchestrator()
 
         # 初始化提供给插件的上下文
         self.star_context = Context(
             self.event_queue,
             self.astrbot_config,
             self.db,
-            self.provider_manager,
             self.platform_manager,
-            self.conversation_manager,
             self.platform_message_history_manager,
-            self.persona_mgr,
             self.astrbot_config_mgr,
-            self.kb_manager,
-            self.cron_manager,
-            self.subagent_orchestrator,
         )
         self.star_context.html_renderer = html_renderer
 
@@ -258,13 +160,6 @@ class AstrBotCoreLifecycle:
 
         # 扫描、注册插件、实例化插件类
         await self.plugin_manager.reload()
-
-        # 根据配置实例化各个 Provider
-        self._default_chat_provider_warning_emitted = False
-        await self.provider_manager.initialize()
-        self._warn_about_unset_default_chat_provider()
-
-        await self.kb_manager.initialize()
 
         # 初始化消息事件流水线调度器
         self.pipeline_scheduler_mapping = await self.load_pipeline_scheduler()
@@ -291,8 +186,6 @@ class AstrBotCoreLifecycle:
         # 初始化关闭控制面板的事件
         self.dashboard_shutdown_event = asyncio.Event()
 
-        asyncio.create_task(update_llm_metadata())
-
     def _load(self) -> None:
         """加载事件总线和任务并初始化."""
         # 创建一个异步任务来执行事件总线的 dispatch() 方法
@@ -301,12 +194,6 @@ class AstrBotCoreLifecycle:
             self.event_bus.dispatch(),
             name="event_bus",
         )
-        cron_task = None
-        if self.cron_manager:
-            cron_task = asyncio.create_task(
-                self.cron_manager.start(self.star_context),
-                name="cron_manager",
-            )
         temp_dir_cleaner_task = None
         if self.temp_dir_cleaner:
             temp_dir_cleaner_task = asyncio.create_task(
@@ -325,8 +212,6 @@ class AstrBotCoreLifecycle:
             *diagnostic_tasks,
             *(extra_tasks if extra_tasks else []),
         ]
-        if cron_task:
-            tasks_.append(cron_task)
         if temp_dir_cleaner_task:
             tasks_.append(temp_dir_cleaner_task)
         for task in tasks_:
@@ -387,11 +272,6 @@ class AstrBotCoreLifecycle:
         for task in self.curr_tasks:
             task.cancel()
 
-        if self.cron_manager:
-            await self.cron_manager.shutdown()
-
-        await shutdown_local_booter()
-
         for plugin in self.plugin_manager.context.get_all_stars():
             try:
                 await self.plugin_manager._terminate_plugin(plugin)
@@ -401,9 +281,7 @@ class AstrBotCoreLifecycle:
                     f"插件 {plugin.name} 未被正常终止 {e!s}, 可能会导致资源泄露等问题。",
                 )
 
-        await self.provider_manager.terminate()
         await self.platform_manager.terminate()
-        await self.kb_manager.terminate()
         if sp.db_helper is self.db:
             await sp.close()
         self.dashboard_shutdown_event.set()
@@ -428,10 +306,7 @@ class AstrBotCoreLifecycle:
 
     async def restart(self) -> None:
         """重启 AstrBot 核心生命周期管理类, 终止各个管理器并重新加载平台实例"""
-        await shutdown_local_booter()
-        await self.provider_manager.terminate()
         await self.platform_manager.terminate()
-        await self.kb_manager.terminate()
         from astrbot.core.utils.trace_store import close_trace_store
 
         await asyncio.to_thread(close_trace_store)

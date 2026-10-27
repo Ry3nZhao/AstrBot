@@ -6,7 +6,6 @@ from astrbot.core import logger
 from astrbot.dashboard.async_utils import run_maybe_async
 from astrbot.dashboard.responses import error, ok
 from astrbot.dashboard.schemas import (
-    BatchSessionProviderRequest,
     BatchSessionServiceRequest,
     SessionGroupRequest,
     SessionRuleRequest,
@@ -193,22 +192,6 @@ async def delete_session_rule(
         return _unexpected_error("删除会话规则失败", exc)
 
 
-@router.patch("/sessions/provider")
-async def update_session_provider(
-    payload: BatchSessionProviderRequest,
-    _auth: AuthContext = Depends(require_data_scope),
-    service: SessionManagementService = Depends(get_service),
-):
-    try:
-        return ok(
-            await service.batch_update_provider(payload.model_dump(exclude_none=True))
-        )
-    except SessionManagementServiceError as exc:
-        return _service_error(exc)
-    except Exception as exc:
-        return _unexpected_error("批量更新 Provider 失败", exc)
-
-
 @router.patch("/sessions/service")
 async def update_session_service(
     payload: BatchSessionServiceRequest,
@@ -379,19 +362,6 @@ async def batch_update_dashboard_session_service(
         request,
         service.batch_update_service,
         label="批量更新服务状态失败",
-    )
-
-
-@legacy_router.post("/batch-update-provider")
-async def batch_update_dashboard_session_provider(
-    request: Request,
-    _username: str = Depends(require_dashboard_user),
-    service: SessionManagementService = Depends(get_service),
-):
-    return await _run_dashboard_json(
-        request,
-        service.batch_update_provider,
-        label="批量更新 Provider 失败",
     )
 
 

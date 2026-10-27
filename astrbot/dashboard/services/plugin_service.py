@@ -16,13 +16,11 @@ import certifi
 
 from astrbot.api import sp
 from astrbot.core import DEMO_MODE, file_token_service, logger
-from astrbot.core.computer.computer_client import sync_skills_to_active_sandboxes
 from astrbot.core.repository import (
     GitUnavailableError,
     normalize_repository_url,
     parse_repository_url,
 )
-from astrbot.core.skills.skill_manager import SkillManager
 from astrbot.core.star.filter.command import CommandFilter
 from astrbot.core.star.filter.command_group import CommandGroupFilter
 from astrbot.core.star.filter.permission import PermissionTypeFilter
@@ -120,12 +118,6 @@ class PluginService:
                 "You are not permitted to do this operation in demo mode"
             )
 
-    async def sync_skills_after_plugin_change(self) -> None:
-        try:
-            await sync_skills_to_active_sandboxes()
-        except Exception:
-            logger.warning("Failed to sync plugin-provided skills to active sandboxes.")
-
     async def check_plugin_version_support(self, data: object) -> dict:
         payload = self._payload(data)
         version_spec = payload.get("astrbot_version", "")
@@ -148,7 +140,6 @@ class PluginService:
         success, err = await self.plugin_manager.reload_failed_plugin(dir_name)
         if not success:
             raise PluginServiceError(f"重载失败: {err}", public_message="重载失败")
-        await self.sync_skills_after_plugin_change()
         return None, f"插件 {dir_name} 重载成功。"
 
     async def reload_plugin(self, data: object) -> tuple[None, str]:
@@ -161,7 +152,6 @@ class PluginService:
                 message or "插件重载失败",
                 public_message="插件重载失败",
             )
-        await self.sync_skills_after_plugin_change()
         return None, "重载成功。"
 
     async def list_plugins(
@@ -678,7 +668,6 @@ class PluginService:
     ) -> list[dict]:
         components = [
             *await self.get_plugin_page_components(plugin, serialize_pages),
-            *self.get_plugin_skill_components(plugin),
             *await self.get_plugin_handler_components(plugin.star_handler_full_names),
         ]
         return sorted(
@@ -801,39 +790,6 @@ class PluginService:
             components.append(component)
 
         return self._merge_command_components(components)
-
-    def get_plugin_skill_components(self, plugin: StarMetadata) -> list[dict]:
-        plugin_names = {
-            str(name)
-            for name in (plugin.root_dir_name, plugin.name)
-            if str(name or "").strip()
-        }
-        if not plugin_names:
-            return []
-
-        try:
-            skills = SkillManager().list_skills(
-                active_only=False,
-                runtime="local",
-                show_sandbox_path=False,
-            )
-        except Exception as exc:
-            logger.warning(f"Failed to get skills for plugin {plugin.name}: {exc!s}")
-            return []
-
-        components = []
-        for skill in skills:
-            if skill.source_type != "plugin" or skill.plugin_name not in plugin_names:
-                continue
-            components.append(
-                {
-                    "type": "skill",
-                    "name": skill.name,
-                    "description": skill.description or "无描述",
-                    "path": skill.path,
-                }
-            )
-        return components
 
     @staticmethod
     def _get_command_filter_display_name(command_filter: CommandFilter) -> str:
@@ -1641,7 +1597,6 @@ class PluginService:
                 repo_url=repo_url,
                 download_url=download_url,
             )
-            await self.sync_skills_after_plugin_change()
             logger.info(f"Installed plugin {repo_url} successfully.")
             return plugin_info or {}, "安装成功。"
         except PluginVersionUnsupportedError as exc:
@@ -1729,7 +1684,6 @@ class PluginService:
                 repo_url="",
                 download_url="",
             )
-            await self.sync_skills_after_plugin_change()
             logger.info(f"Installed plugin {upload_file.filename} successfully.")
             return plugin_info or {}, "安装成功。"
         except PluginVersionUnsupportedError as exc:
@@ -1768,7 +1722,6 @@ class PluginService:
             delete_data=delete_data,
         )
         await self.remove_plugin_install_source(root_dir_name)
-        await self.sync_skills_after_plugin_change()
         logger.info(f"Uninstalled plugin {plugin_name} successfully.")
         return None, "卸载成功"
 
@@ -1787,7 +1740,6 @@ class PluginService:
             delete_config=delete_config,
             delete_data=delete_data,
         )
-        await self.sync_skills_after_plugin_change()
         logger.info(f"Uninstalled failed plugin {dir_name} successfully.")
         return None, "卸载成功"
 
@@ -1808,7 +1760,6 @@ class PluginService:
         )
         await self.refresh_plugin_install_source_after_update(plugin_name, update_info)
         await self.plugin_manager.reload(plugin_name)
-        await self.sync_skills_after_plugin_change()
         logger.info(f"Updated plugin {plugin_name} successfully.")
         return None, "更新成功。"
 
@@ -1885,8 +1836,6 @@ class PluginService:
                 results.append(result)
 
         failed = [result for result in results if result["status"] == "error"]
-        if len(failed) < len(results):
-            await self.sync_skills_after_plugin_change()
         message = (
             "批量更新完成，全部成功。"
             if not failed
@@ -1909,7 +1858,6 @@ class PluginService:
             await self.plugin_manager.turn_off_plugin(plugin_name)
             message = "停用成功。"
             log_action = "Disabled"
-        await self.sync_skills_after_plugin_change()
         logger.info(f"{log_action} plugin {plugin_name}.")
         return None, message
 

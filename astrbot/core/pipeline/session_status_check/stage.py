@@ -14,7 +14,6 @@ class SessionStatusCheckStage(Stage):
 
     async def initialize(self, ctx: PipelineContext) -> None:
         self.ctx = ctx
-        self.conv_mgr = ctx.plugin_manager.context.conversation_manager
 
     async def process(
         self,
@@ -26,15 +25,4 @@ class SessionStatusCheckStage(Stage):
                 f"Session {event.unified_msg_origin} is disabled; event propagation "
                 "was stopped."
             )
-
-            # workaround for #2309
-            conv_id = await self.conv_mgr.get_curr_conversation_id(
-                event.unified_msg_origin,
-            )
-            if not conv_id:
-                await self.conv_mgr.new_conversation(
-                    event.unified_msg_origin,
-                    platform_id=event.get_platform_id(),
-                )
-
             event.stop_event()

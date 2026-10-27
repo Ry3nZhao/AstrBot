@@ -11,7 +11,6 @@ from astrbot.core.utils.webhook_utils import ensure_platform_webhook_config
 
 from .platform import Platform, PlatformStatus
 from .register import platform_cls_map
-from .sources.webchat.webchat_adapter import WebChatAdapter
 
 
 @dataclass
@@ -110,11 +109,6 @@ class PlatformManager:
                 await self.load_platform(platform)
             except Exception as e:
                 logger.error(f"Failed to initialize platform adapter {platform}: {e}")
-
-        # 网页聊天
-        webchat_inst = WebChatAdapter({}, self.settings, self.event_queue)
-        self.platform_insts.append(webchat_inst)
-        self._start_platform_task("webchat", webchat_inst)
 
     async def load_platform(self, platform_config: dict) -> None:
         """实例化一个平台"""

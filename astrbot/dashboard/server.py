@@ -27,8 +27,6 @@ from astrbot.dashboard.asgi_runtime import (
     FastAPIAppAdapter,
 )
 from astrbot.dashboard.responses import error
-from astrbot.dashboard.services.backup_service import CHUNK_SIZE
-from astrbot.dashboard.services.chat_service import MAX_UPLOAD_FILE_SIZE_BYTES
 from astrbot.dashboard.services.config_service import MAX_FILE_BYTES
 
 from .api.app import create_dashboard_asgi_app
@@ -57,19 +55,7 @@ _MULTIPART_OVERHEAD_BYTES = 1024 * 1024
 # to the default; requests without a Content-Length header pass through and
 # are bounded by the per-endpoint max_bytes checks at save time.
 _BODY_LIMIT_OVERRIDES: tuple[tuple[str, int], ...] = (
-    ("/api/v1/backups/upload/chunk", CHUNK_SIZE * 2),
-    ("/api/backup/upload/chunk", CHUNK_SIZE * 2),
-    ("/api/v1/files/upload/chunk", CHUNK_SIZE * 2),
-    ("/api/v1/files", MAX_UPLOAD_FILE_SIZE_BYTES + _MULTIPART_OVERHEAD_BYTES),
-    (
-        "/api/chat/post_file",
-        MAX_UPLOAD_FILE_SIZE_BYTES + _MULTIPART_OVERHEAD_BYTES,
-    ),
     ("/api/v1/plugins/config-files", MAX_FILE_BYTES + _MULTIPART_OVERHEAD_BYTES),
-    (
-        "/api/v1/knowledge-bases/",
-        MAX_UPLOAD_FILE_SIZE_BYTES + _MULTIPART_OVERHEAD_BYTES,
-    ),
 )
 
 

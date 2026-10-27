@@ -2,7 +2,6 @@
 from astrbot.core.config.astrbot_config import AstrBotConfig
 from astrbot import logger
 from astrbot.core import html_renderer
-from astrbot.core.star.register import register_llm_tool as llm_tool
 
 # event
 from astrbot.core.message.message_event_result import (
@@ -36,8 +35,6 @@ from astrbot.core.star import Context, Star
 from astrbot.core.star.config import *
 
 
-# provider
-from astrbot.core.provider import Provider, ProviderMetaData
 from astrbot.core.db.po import Personality
 
 # platform

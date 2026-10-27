@@ -46,10 +46,7 @@ async def delete_bot_data(
         for job in await core.db.list_cron_jobs():
             session = (job.payload or {}).get("session")
             if isinstance(session, str) and session.partition(":")[0] == bot_id:
-                if core.cron_manager:
-                    await core.cron_manager.delete_job(job.job_id)
-                else:
-                    await core.db.delete_cron_job(job.job_id)
+                await core.db.delete_cron_job(job.job_id)
 
     if targets & {"custom_rules", "preferences", "conversations"}:
         async with core.db.get_db() as session:
@@ -101,12 +98,6 @@ async def delete_bot_data(
                 await sp.remove_async(
                     preference.scope, preference.scope_id, preference.key
                 )
-
-    if targets & {"preferences", "conversations"}:
-        manager = core.conversation_manager
-        for umo in list(manager.session_conversations):
-            if umo.partition(":")[0] == bot_id:
-                manager.session_conversations.pop(umo, None)
 
     if "routing" in targets:
         router = core.umop_config_router

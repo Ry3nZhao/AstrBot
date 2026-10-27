@@ -17,7 +17,6 @@ import psutil
 from sqlmodel import col, func, select
 
 from astrbot.core import DEMO_MODE, logger
-from astrbot.core.computer.process_sandbox import get_process_sandbox_status
 from astrbot.core.config import VERSION
 from astrbot.core.config.astrbot_config import AstrBotConfig
 from astrbot.core.core_lifecycle import AstrBotCoreLifecycle
@@ -68,7 +67,6 @@ class StatService:
         self.runtime = {
             "os": platform.system().lower(),
             "arch": platform.machine(),
-            "sandbox": get_process_sandbox_status().copy(),
         }
 
     async def restart_core(self) -> None:

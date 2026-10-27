@@ -10,16 +10,15 @@ from astrbot.core import logger, sp
 from astrbot.core.core_lifecycle import AstrBotCoreLifecycle
 from astrbot.core.db import BaseDatabase
 from astrbot.core.db.po import ConversationV2, Preference, UmoAlias, UmoSender
-from astrbot.core.provider.entities import ProviderType
 from astrbot.core.umo_alias import build_umo_alias_map, parse_umo, serialize_umo_alias
 
 AVAILABLE_SESSION_RULE_KEYS = [
     "session_service_config",
     "session_plugin_config",
     "kb_config",
-    f"provider_perf_{ProviderType.CHAT_COMPLETION.value}",
-    f"provider_perf_{ProviderType.SPEECH_TO_TEXT.value}",
-    f"provider_perf_{ProviderType.TEXT_TO_SPEECH.value}",
+    "provider_perf_chat_completion",
+    "provider_perf_speech_to_text",
+    "provider_perf_text_to_speech",
 ]
 
 
@@ -249,15 +248,7 @@ class SessionManagementService:
             for umo, rules in umo_rules.items()
         ]
 
-        provider_manager = self.core_lifecycle.provider_manager
-        persona_mgr = getattr(self.core_lifecycle, "persona_mgr", None)
         plugin_manager = getattr(self.core_lifecycle, "plugin_manager", None)
-        kb_manager = getattr(self.core_lifecycle, "kb_manager", None)
-
-        available_personas = [
-            {"name": p["name"], "prompt": p.get("prompt", "")}
-            for p in getattr(persona_mgr, "personas_v3", [])
-        ]
         available_plugins = []
         if plugin_manager and getattr(plugin_manager, "context", None):
             available_plugins = [
@@ -270,38 +261,17 @@ class SessionManagementService:
                 if not p.reserved and p.name
             ]
 
-        available_kbs = []
-        if kb_manager:
-            try:
-                kbs = await kb_manager.list_kbs()
-                available_kbs = [
-                    {
-                        "kb_id": kb.kb_id,
-                        "kb_name": kb.kb_name,
-                        "emoji": kb.emoji,
-                    }
-                    for kb in kbs
-                ]
-            except Exception as exc:
-                logger.warning(f"获取知识库列表失败: {exc!s}")
-
         return {
             "rules": rules_list,
             "total": total,
             "page": page,
             "page_size": page_size,
-            "available_personas": available_personas,
-            "available_chat_providers": self._serialize_provider_insts(
-                getattr(provider_manager, "provider_insts", [])
-            ),
-            "available_stt_providers": self._serialize_provider_insts(
-                getattr(provider_manager, "stt_provider_insts", [])
-            ),
-            "available_tts_providers": self._serialize_provider_insts(
-                getattr(provider_manager, "tts_provider_insts", [])
-            ),
+            "available_personas": [],
+            "available_chat_providers": [],
+            "available_stt_providers": [],
+            "available_tts_providers": [],
             "available_plugins": available_plugins,
-            "available_kbs": available_kbs,
+            "available_kbs": [],
             "available_rule_keys": AVAILABLE_SESSION_RULE_KEYS,
         }
 
@@ -456,9 +426,9 @@ class SessionManagementService:
                 ):
                     continue
 
-            chat_provider_key = f"provider_perf_{ProviderType.CHAT_COMPLETION.value}"
-            tts_provider_key = f"provider_perf_{ProviderType.TEXT_TO_SPEECH.value}"
-            stt_provider_key = f"provider_perf_{ProviderType.SPEECH_TO_TEXT.value}"
+            chat_provider_key = "provider_perf_chat_completion"
+            tts_provider_key = "provider_perf_text_to_speech"
+            stt_provider_key = "provider_perf_speech_to_text"
 
             umos_with_status.append(
                 {
@@ -479,7 +449,6 @@ class SessionManagementService:
         end_idx = start_idx + page_size
         paginated = umos_with_status[start_idx:end_idx]
         platforms = list({u["platform"] for u in umos_with_status})
-        provider_manager = self.core_lifecycle.provider_manager
 
         return {
             "sessions": paginated,
@@ -487,15 +456,9 @@ class SessionManagementService:
             "page": page,
             "page_size": page_size,
             "platforms": platforms,
-            "available_chat_providers": self._serialize_provider_insts(
-                getattr(provider_manager, "provider_insts", [])
-            ),
-            "available_tts_providers": self._serialize_provider_insts(
-                getattr(provider_manager, "tts_provider_insts", [])
-            ),
-            "available_stt_providers": self._serialize_provider_insts(
-                getattr(provider_manager, "stt_provider_insts", [])
-            ),
+            "available_chat_providers": [],
+            "available_tts_providers": [],
+            "available_stt_providers": [],
         }
 
     async def batch_update_service(self, data: object) -> dict:
@@ -552,58 +515,6 @@ class SessionManagementService:
 
         return {
             "message": f"已更新 {success_count} 个会话 ({', '.join(status_changes)})",
-            "success_count": success_count,
-            "failed_count": len(failed_umos),
-            "failed_umos": failed_umos,
-        }
-
-    async def batch_update_provider(self, data: object) -> dict:
-        payload = self._payload(data)
-        umos = payload.get("umos", [])
-        scope = payload.get("scope", "")
-        provider_type = payload.get("provider_type")
-        provider_id = payload.get("provider_id")
-
-        if not provider_type or not provider_id:
-            raise SessionManagementServiceError(
-                "缺少必要参数: provider_type, provider_id"
-            )
-
-        provider_type_map = {
-            "chat_completion": ProviderType.CHAT_COMPLETION,
-            "text_to_speech": ProviderType.TEXT_TO_SPEECH,
-            "speech_to_text": ProviderType.SPEECH_TO_TEXT,
-        }
-        if provider_type not in provider_type_map:
-            raise SessionManagementServiceError(
-                f"不支持的 provider_type: {provider_type}"
-            )
-
-        group_id = payload.get("group_id", "")
-        if scope and not umos:
-            umos = await self.get_umos_by_scope(scope, group_id)
-
-        if not umos:
-            raise SessionManagementServiceError("没有找到符合条件的会话")
-
-        success_count = 0
-        failed_umos = []
-        provider_manager = self.core_lifecycle.provider_manager
-
-        for umo in umos:
-            try:
-                await provider_manager.set_provider(
-                    provider_id=provider_id,
-                    provider_type=provider_type_map[provider_type],
-                    umo=umo,
-                )
-                success_count += 1
-            except Exception as exc:
-                logger.error(f"更新 {umo} Provider 失败: {exc!s}")
-                failed_umos.append(umo)
-
-        return {
-            "message": f"已更新 {success_count} 个会话的 {provider_type} 为 {provider_id}",
             "success_count": success_count,
             "failed_count": len(failed_umos),
             "failed_umos": failed_umos,
@@ -732,14 +643,3 @@ class SessionManagementService:
         if page_size > 100:
             page_size = 100
         return page, page_size
-
-    @staticmethod
-    def _serialize_provider_insts(provider_insts: list) -> list[dict]:
-        return [
-            {
-                "id": provider.meta().id,
-                "name": provider.meta().id,
-                "model": provider.meta().model,
-            }
-            for provider in provider_insts
-        ]

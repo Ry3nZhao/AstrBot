@@ -5,7 +5,6 @@ from astrbot.core import logger
 from astrbot.core.log import log_context
 from astrbot.core.platform import AstrMessageEvent
 from astrbot.core.platform.astr_message_event import event_context
-from astrbot.core.platform.sources.webchat.webchat_event import WebChatMessageEvent
 from astrbot.core.platform.sources.wecom_ai_bot.wecomai_event import (
     WecomAIBotMessageEvent,
 )
@@ -96,7 +95,7 @@ class PipelineScheduler:
             await self._process_stages(event)
 
             # Send the closing frame before the event is marked complete.
-            if isinstance(event, WebChatMessageEvent | WecomAIBotMessageEvent):
+            if isinstance(event, WecomAIBotMessageEvent):
                 await event.send(None)
 
             logger.debug("pipeline execution completed.")
