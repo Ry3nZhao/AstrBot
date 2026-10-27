@@ -1,13 +1,12 @@
 from collections.abc import AsyncGenerator
 
 from astrbot.core.platform.astr_message_event import AstrMessageEvent
-from astrbot.core.provider.entities import ProviderRequest
 from astrbot.core.star.star_handler import StarHandlerMetadata
 from astrbot.core.utils.session_waiter import FILTERS, USER_SESSIONS, SessionWaiter
 
 from ..context import PipelineContext
 from ..stage import Stage, register_stage
-from .method.agent_request import AgentRequestSubStage
+from .method.loagent_forward import LoAgentForwardSubStage
 from .method.star_request import StarRequestSubStage
 
 
@@ -18,9 +17,9 @@ class ProcessStage(Stage):
         self.config = ctx.astrbot_config
         self.plugin_manager = ctx.plugin_manager
 
-        # initialize agent sub stage
-        self.agent_sub_stage = AgentRequestSubStage()
-        await self.agent_sub_stage.initialize(ctx)
+        # LoAgent channel gateway: forward woken messages to LoAgent.
+        self.loagent_sub_stage = LoAgentForwardSubStage()
+        await self.loagent_sub_stage.initialize(ctx)
 
         # initialize star request sub stage
         self.star_request_sub_stage = StarRequestSubStage()
@@ -45,23 +44,8 @@ class ProcessStage(Stage):
         )
         # 有插件 Handler 被激活
         if activated_handlers:
-            async for resp in self.star_request_sub_stage.process(event):
-                # 生成器返回值处理
-                if isinstance(resp, ProviderRequest):
-                    # Handler 的 LLM 请求
-                    event.set_extra("provider_request", resp)
-                    _t = False
-                    async for _ in self.agent_sub_stage.process(event):
-                        _t = True
-                        yield
-                    if not _t:
-                        yield
-                else:
-                    yield
-
-        # 调用 LLM 相关请求
-        if not self.ctx.astrbot_config["provider_settings"].get("enable", True):
-            return
+            async for _ in self.star_request_sub_stage.process(event):
+                yield
 
         if (
             not event._has_send_oper
@@ -72,5 +56,5 @@ class ProcessStage(Stage):
             if (
                 event.get_result() and not event.is_stopped()
             ) or not event.get_result():
-                async for _ in self.agent_sub_stage.process(event):
+                async for _ in self.loagent_sub_stage.process(event):
                     yield
