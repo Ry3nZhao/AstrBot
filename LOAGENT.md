@@ -1,6 +1,6 @@
 # AstrBot 的 LoAgent 通道网关分支（`loagent-gateway`）
 
-这个分支把 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 精简成 [LoAgent](https://github.com/RuihanRZhao/LoAgent) 的**群聊通道网关**：
+这个分支把 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 精简成 [LoAgent](https://github.com/Ry3nZhao/LoAgent) 的**群聊通道网关**：
 
 - AstrBot 只负责**通道（平台适配器）、路由（UMO → 配置）、唤醒规则**（@、唤醒词、私聊、白名单、限流、会话开关）。
 - 大脑、记忆、人格都在 LoAgent。被唤醒的消息由新增的流水线阶段 `loagent_forward` 转发给 LoAgent，LoAgent 决定回复什么或者不说话。
@@ -147,5 +147,5 @@
 ## 许可证
 
 - AstrBot 以 **AGPL-3.0-or-later** 发布，本分支继续沿用：保留上游的 `LICENSE`、版权声明和作者信息，`pyproject.toml` 的 `license` 不变。
-- fork（`RuihanRZhao/AstrBot`）是公开仓库，所有修改都以源码形式公开，满足 AGPL 第 13 条「通过网络提供服务时公开修改后源码」的要求。
+- fork（`Ry3nZhao/AstrBot`）是公开仓库，所有修改都以源码形式公开，满足 AGPL 第 13 条「通过网络提供服务时公开修改后源码」的要求。
 - LoAgent 只通过 HTTP 和这个网关通信（`/api/channel/message`、`/im/messages`），两者是独立的程序，LoAgent 的许可证不受影响。
