@@ -15,7 +15,7 @@
       "notice": { "type": "member_left", "user_id": "40004", "operator_id": "20002", "kicked": true }
     },
     {
-      "v": 1, "id": "c0000000000000000000000000000003", "dedupe_key": "notice:qq:10001:recalled:777",
+      "v": 1, "id": "c0000000000000000000000000000003", "dedupe_key": "notice:qq:10001:recalled:group:123456:777",
       "time_ms": 1794023600100, "kind": "notice",
       "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
       "conversation": { "kind": "group", "id": "123456" },

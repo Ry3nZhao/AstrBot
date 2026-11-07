@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "request_id": "bot.send:bot-2:telegram:7000000001:group:-1001234567890#42:7",
+  "account": { "platform": "telegram", "instance": "tg_main", "self_id": "7000000001" },
+  "conversation": { "kind": "group", "id": "-1001234567890", "thread_id": "42" },
+  "segments": [
+    { "type": "reply", "message_id": "315", "segments": [] },
+    { "type": "text", "text": "好看" }
+  ]
+}

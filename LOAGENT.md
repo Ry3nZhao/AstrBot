@@ -14,9 +14,9 @@
 ### 分工和连接
 
 ```
-QQ（NapCat）──OneBot v11 反向 WS──┐
+QQ（NapCat，我们的 fork）──OneBot v11 反向 WS──┐
 微信（wechat-selkies 网关）─OneBot v11 反向 WS──┤ AstrBot（网关模式）
-Telegram、飞书……（以后）──各平台 SDK──┘   │ ① POST {Bot 服务}/v1/events（异步上报，2xx 才算收到）
+Telegram、Discord、LINE──各平台 SDK──┘   │ ① POST {Bot 服务}/v1/events（异步上报，2xx 才算收到）
                                          │ ② Bot 服务 → /api/v1/loagent/*（发送、查询、媒体）
                                    Bot 服务（loagent-bots）
 ```
@@ -37,16 +37,20 @@ Telegram、飞书……（以后）──各平台 SDK──┘   │ ① POST {
 | 类型 | 字段 |
 |---|---|
 | `AccountRef` | `platform`（网络：`qq`、`wechat`、`telegram`……）、`instance`（AstrBot 平台实例 id，发送时要用）、`self_id`（这个号自己的 id） |
-| `Conversation` | `kind`（`group` / `private`）、`id`（群号；私聊是对方的 id）、`name?`（群名，只作显示） |
+| `Conversation` | `kind`（`group` / `private`）、`id`（发消息时的目标，见下）、`thread_id?`（Telegram 论坛话题，算身份）、`guild_id?`（Discord 服务器，只作参考）、`name?`（群名，只作显示） |
 | `Sender` | `user_id`、`nickname`、`card?`（群名片）、`role?`（`owner` / `admin` / `member`）、`is_self`（这个号自己发的，比如从手机上） |
 
 - `platform`：QQ 和微信都走 OneBot v11（适配器都是 `aiocqhttp`），所以由平台实例的配置项 **`loagent_platform`** 说明是哪个网络（Bot 服务用 `/bots` 管理接口建实例时填上）；没填时 OneBot 实例是 `onebot`，其他适配器用适配器名。
+- 会话的 `id` 是平台发消息时用的目标：QQ、微信、LINE 的群（LINE 的多人聊天 room 也算群）、Telegram 的群、Discord 的频道；私聊在 QQ、微信、Telegram、LINE 上是对方的 id，在 Discord 上是私信频道的 id（发送者的 id 在 `sender` 里）。会话的键是 `group:<id>`、`group:<id>#<thread_id>` 或 `private:<id>`，消息记录和会话记忆库按它分。
+- 平台范围（用户定，2026-11-07）：QQ、微信个人号、Telegram、Discord、LINE。协议覆盖这五个；网关先完整实现 QQ 和微信（OneBot v11），Telegram、Discord、LINE 现在走 AstrBot 自己的适配器和通用发送路径（收发能用，查询接口还没有，发送不回消息 id），以后逐个补。
 - 用户 id 只在同一个网络里可比。微信网关给的 id 是它自己映射出来的数字，换一个微信号就对不上，人物库合并时要注意。
 
 ### 消息和段
 
 `Message`：`id`（平台消息 id；微信是网关给的稳定 id）、`account`、`conversation`、`sender`、`segments[]`、`reply_to?`、`at[]`、`sent_at_ms?`、`received_at_ms`。
 
+- 消息 id、`reply_to` 和媒体的 `sha256` 是 Bot 服务清理旧消息和媒体时判断「被引用」的依据（用户定：文字和媒体都按时长清，被记忆或人物备注引用的不清）。
+- Discord 适配器会把开头 @Bot 的文字去掉、也不生成 @ 组件，网关从 Discord 原始消息的提及列表补上 `at` 段，唤醒规则才看得到。
 - `reply_to` 和 `at` 是从段里推出来的，方便唤醒规则：`reply_to` 是第一个 `reply` 段的消息 id；`at` 是被 @ 的 id，@全体是 `"all"`，按出现顺序、不重复。**以段为准**。
 - 收和发用同一套段（`type` 区分）：
 
@@ -57,7 +61,7 @@ Telegram、飞书……（以后）──各平台 SDK──┘   │ ① POST {
 | `at_all` | — | @全体成员 |
 | `reply` | `message_id`、`sender_id?`、`sender_name?`、`text?`、`segments[]` | 引用。收到时网关填上原消息的发送者、文字和段（只展开一层）；发送时只看 `message_id` |
 | `image` | `media`、`summary?` | |
-| `sticker` | `media?`、`face_id?`、`name?` | 表情包（有 `media`）或平台表情（有 `face_id`，QQ 的 face） |
+| `sticker` | `media?`、`face_id?`、`name?` | 表情包（有 `media`，比如 Telegram 的贴纸）或平台表情（有 `face_id`：QQ 是 face 编号，LINE 是 `<packageId>:<stickerId>`） |
 | `voice` | `media`、`duration_ms?`、`text?` | `text` 是平台自带的转写 |
 | `video` | `media`、`cover?`、`duration_ms?` | |
 | `file` | `media` | 文件名在 `media.name` |
@@ -104,9 +108,9 @@ Telegram、飞书……（以后）──各平台 SDK──┘   │ ① POST {
 
 | 事件 | 键 |
 |---|---|
-| 消息 | `msg:<platform>:<self_id>:<消息 id>`；平台没给 id 时，用会话、发送者、时间、文字算一个 `h…` 哈希当 id |
+| 消息 | `msg:<platform>:<self_id>:<会话键>:<消息 id>`（Telegram 的消息号只在一个群里唯一，所以带上会话）；平台没给 id 时，用会话、发送者、时间、文字算一个 `h…` 哈希当 id |
 | 入群、退群 | `notice:<platform>:<self_id>:member_joined:<群>:<人>:<时间秒>`（`member_left` 同理） |
-| 撤回 | `notice:<platform>:<self_id>:recalled:<消息 id>` |
+| 撤回 | `notice:<platform>:<self_id>:recalled:<会话键>:<消息 id>` |
 | 戳一戳 | `notice:<platform>:<self_id>:poke:<会话>:<人>:<目标>:<时间秒>` |
 | 加好友 | `notice:<platform>:<self_id>:friend_added:<人>:<时间秒>` |
 | 请求 | `notice:<platform>:<self_id>:request:<种类>:<flag>` |

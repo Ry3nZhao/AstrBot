@@ -133,4 +133,4 @@ def test_derived_fields():
     ).derive_fields()
     assert msg.reply_to == "5"
     assert msg.at == ["1", "all"]
-    assert msg.dedupe_key() == "msg:qq:1:7"
+    assert msg.dedupe_key() == "msg:qq:1:group:2:7"

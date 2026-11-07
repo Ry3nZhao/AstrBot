@@ -511,7 +511,7 @@ class LoAgentGateway:
             message_type=MessageType.GROUP_MESSAGE
             if req.conversation.kind == "group"
             else MessageType.FRIEND_MESSAGE,
-            session_id=req.conversation.id,
+            session_id=convert.session_id_for(inst.meta().name, req.conversation),
         )
         try:
             await inst.send_by_session(session, MessageChain(chain))

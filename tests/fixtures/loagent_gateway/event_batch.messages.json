@@ -3,7 +3,7 @@
     {
       "v": 1,
       "id": "6f1c2b0e9d8a4c7b8e5f4a3b2c1d0e9f",
-      "dedupe_key": "msg:qq:10001:777",
+      "dedupe_key": "msg:qq:10001:group:123456:777",
       "time_ms": 1794023157120,
       "kind": "message",
       "message": {
@@ -39,7 +39,7 @@
     {
       "v": 1,
       "id": "0a1b2c3d4e5f60718293a4b5c6d7e8f9",
-      "dedupe_key": "msg:qq:10001:778",
+      "dedupe_key": "msg:qq:10001:private:20002:778",
       "time_ms": 1794023160050,
       "kind": "message",
       "message": {
@@ -62,7 +62,7 @@
     {
       "v": 1,
       "id": "aa00bb11cc22dd33ee44ff5566778899",
-      "dedupe_key": "msg:wechat:900001:41",
+      "dedupe_key": "msg:wechat:900001:group:800012:41",
       "time_ms": 1794023200000,
       "kind": "message",
       "message": {
@@ -82,7 +82,7 @@
     {
       "v": 1,
       "id": "11112222333344445555666677778888",
-      "dedupe_key": "msg:qq:10001:779",
+      "dedupe_key": "msg:qq:10001:group:123456:779",
       "time_ms": 1794023300000,
       "kind": "message",
       "message": {

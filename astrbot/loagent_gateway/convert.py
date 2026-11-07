@@ -163,14 +163,72 @@ def segments_from_chain(
 
 
 def conversation_of(event: AstrMessageEvent) -> P.Conversation:
+    """The conversation, with ``id`` being what the platform sends to.
+
+    Telegram forum topics come from AstrBot as ``<chat>#<thread>``; they are
+    split into ``id`` and ``thread_id``. Discord channels carry their server
+    as ``guild_id``. A private chat is the other person on OneBot, and the
+    adapter's session (Discord's DM channel, LINE/Telegram user) elsewhere.
+    """
     obj = event.message_obj
-    group_id = obj.group_id if hasattr(obj, "group_id") else ""
+    adapter = event.get_platform_name()
+    group_id = str(getattr(obj, "group_id", "") or "")
+    raw = getattr(obj, "raw_message", None)
+    guild = getattr(raw, "guild", None) if adapter == "discord" else None
+    guild_id = _str_or_none(getattr(guild, "id", None))
     if obj.type == MessageType.GROUP_MESSAGE and group_id:
         name = obj.group.group_name if obj.group else None
-        return P.Conversation(kind="group", id=str(group_id), name=name or None)
+        thread_id = None
+        if adapter == "telegram" and "#" in group_id:
+            group_id, thread_id = group_id.split("#", 1)
+        return P.Conversation(
+            kind="group",
+            id=group_id,
+            thread_id=thread_id,
+            guild_id=guild_id,
+            name=name or None,
+        )
     sender = getattr(obj, "sender", None)
-    peer = str(getattr(sender, "user_id", "") or obj.session_id or "")
+    if adapter == ONEBOT:
+        peer = str(getattr(sender, "user_id", "") or obj.session_id or "")
+    else:
+        peer = str(obj.session_id or getattr(sender, "user_id", "") or "")
     return P.Conversation(kind="private", id=peer)
+
+
+def session_id_for(adapter: str, conversation: P.Conversation) -> str:
+    """The AstrBot session id an adapter's ``send_by_session`` expects."""
+    if adapter == "telegram" and conversation.thread_id:
+        return f"{conversation.id}#{conversation.thread_id}"
+    return conversation.id
+
+
+def mention_segments(
+    event: AstrMessageEvent, present: list[P.Segment]
+) -> list[P.Segment]:
+    """Mentions an adapter took out of the components.
+
+    AstrBot's Discord adapter strips the leading bot mention from the text and
+    makes no ``At`` for any mention; the Discord message still lists them.
+    """
+    if event.get_platform_name() != "discord":
+        return []
+    raw = getattr(event.message_obj, "raw_message", None)
+    have = {s.user_id for s in present if isinstance(s, P.AtSegment)}
+    out: list[P.Segment] = []
+    if getattr(raw, "mention_everyone", False) is True and not any(
+        isinstance(s, P.AtAllSegment) for s in present
+    ):
+        out.append(P.AtAllSegment())
+    for user in getattr(raw, "mentions", None) or []:
+        uid = _str_or_none(getattr(user, "id", None))
+        if uid and uid not in have:
+            have.add(uid)
+            name = getattr(user, "display_name", None) or getattr(user, "name", None)
+            out.append(
+                P.AtSegment(user_id=uid, name=name if isinstance(name, str) else None)
+            )
+    return out
 
 
 def sender_of(event: AstrMessageEvent, self_id: str) -> P.Sender:
@@ -209,6 +267,7 @@ def message_from_event(
     else:
         sent_ms = None
     segments = segments_from_chain(obj.message, media)
+    segments = mention_segments(event, segments) + segments
     message_id = str(getattr(obj, "message_id", "") or "")
     conversation = conversation_of(event)
     sender = sender_of(event, account.self_id)
@@ -278,7 +337,7 @@ def onebot_notice(
                 P.Recalled(
                     message_id=message_id, user_id=user or None, operator_id=operator
                 ),
-                f"{prefix}:recalled:{message_id}",
+                f"{prefix}:recalled:{conv.key()}:{message_id}",
             )
         if kind == "notify" and sub == "poke":
             target = str(raw.get("target_id") or "")

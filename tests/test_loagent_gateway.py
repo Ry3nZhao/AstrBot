@@ -234,7 +234,7 @@ async def test_group_message_is_reported_with_every_segment(tmp_path):
     [body] = queued(gw, "message")
     event = P.MessageEvent.model_validate(body)
     msg = event.message
-    assert event.dedupe_key == "msg:qq:10001:777"
+    assert event.dedupe_key == "msg:qq:10001:group:123456:777"
     assert msg.account == P.AccountRef(
         platform="qq", instance="qq_main", self_id="10001"
     )
@@ -389,7 +389,7 @@ async def test_notices_and_requests(tmp_path):
     ]
     assert notices[1].kicked is True
     assert notices[2].message_id == "777"
-    assert events[2].dedupe_key == "notice:qq:10001:recalled:777"
+    assert events[2].dedupe_key == "notice:qq:10001:recalled:group:123456:777"
     assert notices[3].target_id == str(SELF_ID)
     assert events[4].conversation == P.Conversation(kind="private", id="50005")
     assert notices[5].request == "group_invite" and notices[5].flag == "f1"
@@ -900,3 +900,131 @@ def test_media_store_ingest_and_cleanup(tmp_path):
     assert store.cleanup(7) == 0
     assert store.cleanup(-1) == 1
     assert store.read_ref(m.url) is None
+
+
+# --- Telegram, Discord, LINE (through AstrBot's generic path) ------------------
+
+
+class _FakePlatform:
+    """A non-OneBot adapter: only what the gateway touches."""
+
+    def __init__(self, adapter: str, instance: str) -> None:
+        from astrbot.core.platform.platform_metadata import PlatformMetadata
+
+        self._meta = PlatformMetadata(name=adapter, description="", id=instance)
+        self.config = {"id": instance}
+        self.status = PlatformStatus.RUNNING
+        self.last_error = None
+        self.sent: list[tuple[object, list]] = []
+
+    def meta(self):
+        return self._meta
+
+    async def send_by_session(self, session, chain):
+        self.sent.append((session, chain.chain))
+
+
+def _generic_event(
+    platform: _FakePlatform,
+    *,
+    group_id="",
+    session_id,
+    sender="u1",
+    raw=None,
+    chain=None,
+    message_id="m1",
+):
+    from astrbot.core.message.components import Plain
+    from astrbot.core.platform.astr_message_event import AstrMessageEvent
+    from astrbot.core.platform.astrbot_message import AstrBotMessage, MessageMember
+    from astrbot.core.platform.message_type import MessageType
+
+    abm = AstrBotMessage()
+    abm.type = MessageType.GROUP_MESSAGE if group_id else MessageType.FRIEND_MESSAGE
+    abm.group_id = group_id
+    abm.session_id = session_id
+    abm.self_id = "bot"
+    abm.message_id = message_id
+    abm.sender = MessageMember(user_id=sender, nickname="Someone")
+    abm.message = chain or [Plain("hi")]
+    abm.message_str = "hi"
+    abm.raw_message = raw
+    abm.timestamp = 1700000000
+    return AstrMessageEvent("hi", abm, platform.meta(), session_id)
+
+
+@pytest.mark.asyncio
+async def test_telegram_topic_becomes_thread_id_and_is_sent_back(tmp_path):
+    tg = _FakePlatform("telegram", "tg_main")
+    gw = make_gateway(tmp_path, [tg])
+    await gw.ingest(
+        _generic_event(
+            tg, group_id="-100123#42", session_id="-100123#42", message_id="315"
+        )
+    )
+    event = P.MessageEvent.model_validate(queued(gw, "message")[0])
+    conv = event.message.conversation
+    assert (conv.id, conv.thread_id) == ("-100123", "42")
+    assert event.message.account.platform == "telegram"
+    assert event.dedupe_key == "msg:telegram:bot:group:-100123#42:315"
+
+    req = send_request(
+        [{"type": "text", "text": "好"}],
+        platform="telegram",
+        instance="tg_main",
+        conv="-100123",
+    )
+    req.conversation.thread_id = "42"
+    req.account.self_id = "bot"
+    result = await gw.send(req)
+    [(session, chain)] = tg.sent
+    assert session.session_id == "-100123#42" and chain[0].text == "好"
+    assert result.message_ids == []
+
+
+@pytest.mark.asyncio
+async def test_discord_mentions_guild_and_dm_channel(tmp_path):
+    from types import SimpleNamespace
+
+    dc = _FakePlatform("discord", "discord_main")
+    gw = make_gateway(tmp_path, [dc])
+    raw = SimpleNamespace(
+        guild=SimpleNamespace(id=9),
+        mention_everyone=False,
+        mentions=[
+            SimpleNamespace(id=1100, display_name="LoBot"),
+            SimpleNamespace(id=1400, display_name="Bob"),
+        ],
+    )
+    await gw.ingest(_generic_event(dc, group_id="1200", session_id="1200", raw=raw))
+    dm = SimpleNamespace(guild=None, mention_everyone=False, mentions=[])
+    await gw.ingest(
+        _generic_event(dc, session_id="5550", sender="1400", raw=dm, message_id="m2")
+    )
+    a, b = (P.MessageEvent.model_validate(x).message for x in queued(gw, "message"))
+    assert (a.conversation.id, a.conversation.guild_id) == ("1200", "9")
+    assert a.at == ["1100", "1400"] and a.segments[-1].text == "hi"
+    assert b.conversation == P.Conversation(kind="private", id="5550")  # the DM channel
+    assert b.sender.user_id == "1400"
+
+
+@pytest.mark.asyncio
+async def test_line_private_chat_uses_the_user_id(tmp_path):
+    line = _FakePlatform("line", "line_main")
+    gw = make_gateway(tmp_path, [line])
+    await gw.ingest(_generic_event(line, session_id="U4af", sender="U4af"))
+    msg = P.MessageEvent.model_validate(queued(gw, "message")[0]).message
+    assert msg.account.platform == "line" and msg.conversation.id == "U4af"
+    req = send_request(
+        [
+            {"type": "text", "text": "hello"},
+            {"type": "share", "url": "https://e", "title": "t"},
+        ],
+        platform="line",
+        instance="line_main",
+        kind="private",
+        conv="U4af",
+    )
+    result = await gw.send(req)
+    assert line.sent[0][0].session_id == "U4af"
+    assert [(d.from_, d.to) for d in result.degraded] == [("share", "text")]

@@ -54,9 +54,19 @@ class AccountRef(_Model):
 
 
 class Conversation(_Model):
+    """``id`` is what the platform sends to (group, chat, channel; for a private
+    chat the other person, or Discord's DM channel). ``thread_id``: Telegram
+    forum topic, part of identity. ``guild_id``: Discord server, informational."""
+
     kind: ConversationKind
     id: str
+    thread_id: str | None = None
+    guild_id: str | None = None
     name: str | None = None
+
+    def key(self) -> str:
+        base = f"{self.kind}:{self.id}"
+        return f"{base}#{self.thread_id}" if self.thread_id else base
 
 
 class Sender(_Model):
@@ -229,7 +239,7 @@ class Message(_Model):
         return self
 
     def dedupe_key(self) -> str:
-        return f"msg:{self.account.key()}:{self.id}"
+        return f"msg:{self.account.key()}:{self.conversation.key()}:{self.id}"
 
 
 # --- inbound events ----------------------------------------------------------

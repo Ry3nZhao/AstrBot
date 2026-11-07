@@ -1,0 +1,55 @@
+{
+  "events": [
+    {
+      "v": 1, "id": "e0000000000000000000000000000001", "dedupe_key": "msg:telegram:7000000001:group:-1001234567890#42:315",
+      "time_ms": 1794024100000, "kind": "message",
+      "message": {
+        "id": "315",
+        "account": { "platform": "telegram", "instance": "tg_main", "self_id": "7000000001" },
+        "conversation": { "kind": "group", "id": "-1001234567890", "thread_id": "42", "name": "测试超级群" },
+        "sender": { "user_id": "5550001", "nickname": "alice_tg", "is_self": false },
+        "segments": [
+          { "type": "at", "user_id": "loagent_bot", "name": "loagent_bot" },
+          { "type": "text", "text": " 看这个" },
+          { "type": "sticker", "media": { "url": "gateway://4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a", "mime": "image/webp", "size": 2048, "sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a" }, "name": "😀" }
+        ],
+        "at": ["loagent_bot"],
+        "sent_at_ms": 1794024099000,
+        "received_at_ms": 1794024099500
+      }
+    },
+    {
+      "v": 1, "id": "e0000000000000000000000000000002", "dedupe_key": "msg:discord:1100000000000000001:group:1200000000000000002:1300000000000000003",
+      "time_ms": 1794024200000, "kind": "message",
+      "message": {
+        "id": "1300000000000000003",
+        "account": { "platform": "discord", "instance": "discord_main", "self_id": "1100000000000000001" },
+        "conversation": { "kind": "group", "id": "1200000000000000002", "guild_id": "1000000000000000009", "name": "LoAgent / general" },
+        "sender": { "user_id": "1400000000000000004", "nickname": "Bob", "is_self": false },
+        "segments": [
+          { "type": "at", "user_id": "1100000000000000001" },
+          { "type": "text", "text": "what's up" },
+          { "type": "file", "media": { "url": "https://cdn.discordapp.com/attachments/1/2/notes.txt", "name": "notes.txt" } }
+        ],
+        "at": ["1100000000000000001"],
+        "received_at_ms": 1794024199900
+      }
+    },
+    {
+      "v": 1, "id": "e0000000000000000000000000000003", "dedupe_key": "msg:line:Ubot0000000000000000000000000000:private:U4af4980629000000000000000000000:510000000000000",
+      "time_ms": 1794024300000, "kind": "message",
+      "message": {
+        "id": "510000000000000",
+        "account": { "platform": "line", "instance": "line_main", "self_id": "Ubot0000000000000000000000000000" },
+        "conversation": { "kind": "private", "id": "U4af4980629000000000000000000000" },
+        "sender": { "user_id": "U4af4980629000000000000000000000", "nickname": "Carol", "is_self": false },
+        "segments": [
+          { "type": "sticker", "face_id": "446:1988", "name": "[sticker]" }
+        ],
+        "at": [],
+        "sent_at_ms": 1794024299000,
+        "received_at_ms": 1794024299300
+      }
+    }
+  ]
+}
