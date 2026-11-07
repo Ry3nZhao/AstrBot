@@ -1,0 +1,28 @@
+{
+  "events": [
+    {
+      "v": 1, "id": "d0000000000000000000000000000001", "dedupe_key": "account:qq:10001:online:1794020000000",
+      "time_ms": 1794020000000, "kind": "account",
+      "status": {
+        "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+        "state": "online", "nickname": "小助手", "since_ms": 1794020000000, "last_seen_ms": 1794020000000
+      }
+    },
+    {
+      "v": 1, "id": "d0000000000000000000000000000002", "dedupe_key": "account:qq:10001:offline:1794030000000",
+      "time_ms": 1794030000000, "kind": "account",
+      "status": {
+        "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+        "state": "offline", "reason": "kicked", "detail": "你的账号在另一台设备上登录", "since_ms": 1794030000000, "last_seen_ms": 1794029990000
+      }
+    },
+    {
+      "v": 1, "id": "d0000000000000000000000000000003", "dedupe_key": "account:wechat:900001:offline:1794031000000",
+      "time_ms": 1794031000000, "kind": "account",
+      "status": {
+        "account": { "platform": "wechat", "instance": "wechat_main", "self_id": "900001" },
+        "state": "offline", "reason": "heartbeat_timeout", "since_ms": 1794031000000, "last_seen_ms": 1794030880000
+      }
+    }
+  ]
+}

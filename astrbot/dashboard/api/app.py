@@ -38,6 +38,7 @@ from astrbot.dashboard.services.update_service import (
     call_get_dashboard_version,
     call_pip_install,
 )
+from astrbot.loagent_gateway import api as loagent_gateway_api
 
 from .api_keys import legacy_router as legacy_api_keys_router
 from .auth import legacy_router as legacy_auth_router
@@ -173,6 +174,7 @@ def create_dashboard_asgi_app(
     app.include_router(legacy_plugins_router)
     app.include_router(legacy_t2i_router)
     app.include_router(legacy_updates_router)
+    loagent_gateway_api.install(app)
     app.include_router(build_api_router())
     app.include_router(static_files_router)
     return app

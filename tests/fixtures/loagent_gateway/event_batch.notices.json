@@ -1,0 +1,52 @@
+{
+  "events": [
+    {
+      "v": 1, "id": "c0000000000000000000000000000001", "dedupe_key": "notice:qq:10001:member_joined:123456:40004:1794023400",
+      "time_ms": 1794023400100, "kind": "notice",
+      "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+      "conversation": { "kind": "group", "id": "123456" },
+      "notice": { "type": "member_joined", "user_id": "40004", "operator_id": "20002" }
+    },
+    {
+      "v": 1, "id": "c0000000000000000000000000000002", "dedupe_key": "notice:qq:10001:member_left:123456:40004:1794023500",
+      "time_ms": 1794023500100, "kind": "notice",
+      "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+      "conversation": { "kind": "group", "id": "123456" },
+      "notice": { "type": "member_left", "user_id": "40004", "operator_id": "20002", "kicked": true }
+    },
+    {
+      "v": 1, "id": "c0000000000000000000000000000003", "dedupe_key": "notice:qq:10001:recalled:777",
+      "time_ms": 1794023600100, "kind": "notice",
+      "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+      "conversation": { "kind": "group", "id": "123456" },
+      "notice": { "type": "recalled", "message_id": "777", "user_id": "20002", "operator_id": "20002" }
+    },
+    {
+      "v": 1, "id": "c0000000000000000000000000000004", "dedupe_key": "notice:qq:10001:poke:123456:20002:10001:1794023700",
+      "time_ms": 1794023700100, "kind": "notice",
+      "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+      "conversation": { "kind": "group", "id": "123456" },
+      "notice": { "type": "poke", "user_id": "20002", "target_id": "10001" }
+    },
+    {
+      "v": 1, "id": "c0000000000000000000000000000005", "dedupe_key": "notice:qq:10001:friend_added:50005:1794023800",
+      "time_ms": 1794023800100, "kind": "notice",
+      "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+      "conversation": { "kind": "private", "id": "50005" },
+      "notice": { "type": "friend_added", "user_id": "50005" }
+    },
+    {
+      "v": 1, "id": "c0000000000000000000000000000006", "dedupe_key": "notice:qq:10001:request:friend:flag-abc",
+      "time_ms": 1794023900100, "kind": "notice",
+      "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+      "notice": { "type": "request", "request": "friend", "user_id": "60006", "comment": "我是 Alice 的朋友", "flag": "flag-abc" }
+    },
+    {
+      "v": 1, "id": "c0000000000000000000000000000007", "dedupe_key": "notice:qq:10001:other:5d41402abc4b2a76b9719d911017c592",
+      "time_ms": 1794024000100, "kind": "notice",
+      "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+      "conversation": { "kind": "group", "id": "123456" },
+      "notice": { "type": "other", "adapter": "aiocqhttp", "raw": { "post_type": "notice", "notice_type": "group_ban", "sub_type": "ban", "group_id": 123456, "user_id": 40004, "operator_id": 20002, "duration": 600 } }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "v": 1,
+  "request_id": "bot.send:bot-1:qq:10001:private:20002:43",
+  "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+  "conversation": { "kind": "private", "id": "20002" },
+  "segments": [
+    { "type": "text", "text": "资料在这里：" },
+    { "type": "file", "media": { "url": "gateway://2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae", "name": "资料.pdf" } },
+    { "type": "voice", "media": { "url": "https://example.com/tts/43.mp3" } },
+    {
+      "type": "forward",
+      "nodes": [
+        { "sender_id": "10001", "sender_name": "小助手", "segments": [{ "type": "text", "text": "第一条" }] },
+        { "sender_id": "20002", "sender_name": "Alice", "time_ms": 1794023157000, "segments": [{ "type": "text", "text": "第二条" }] }
+      ]
+    },
+    { "type": "share", "url": "https://example.com/a", "title": "一篇文章" }
+  ]
+}

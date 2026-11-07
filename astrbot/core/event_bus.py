@@ -51,12 +51,17 @@ class EventBus:
         # 持有正在执行的 pipeline 任务的强引用, 防止 task 在 pending 状态被 GC 回收
         self._pending_tasks: dict[asyncio.Task, AstrMessageEvent] = {}
         self.stopped_platforms: set[str] = set()
+        # LoAgent gateway (LOAGENT.md): sees every event first; True means it
+        # took the event and the pipeline does not run.
+        self.observer: Callable[[AstrMessageEvent], bool] | None = None
 
     async def dispatch(self) -> None:
         while True:
             event: AstrMessageEvent = await self.event_queue.get()
             if event.get_platform_id() in self.stopped_platforms:
                 event.trace.record("pipeline_end", status="cancelled")
+                continue
+            if self.observer is not None and self.observer(event):
                 continue
             conf_info = self.astrbot_config_mgr.get_conf_info(event.unified_msg_origin)
             conf_id = conf_info["id"]

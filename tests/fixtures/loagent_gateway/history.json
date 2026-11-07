@@ -1,0 +1,14 @@
+{
+  "messages": [
+    {
+      "id": "555",
+      "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+      "conversation": { "kind": "group", "id": "123456" },
+      "sender": { "user_id": "10001", "nickname": "小助手", "is_self": true },
+      "segments": [{ "type": "text", "text": "看这张图" }],
+      "at": [],
+      "sent_at_ms": 1794023100000,
+      "received_at_ms": 1794023157500
+    }
+  ]
+}

@@ -1,12 +1,198 @@
-# AstrBot 的 LoAgent 通道网关分支（`loagent-gateway`）
+# AstrBot 的 LoAgent 网关分支（`feat/loagent-gateway`）
 
-这个分支把 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 精简成 [LoAgent](https://github.com/Ry3nZhao/LoAgent) 的**群聊通道网关**：
+这个分支把 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 精简成 [LoAgent](https://github.com/Ry3nZhao/LoAgent) 的**平台接入层**。它有两种用法：
 
-- AstrBot 只负责**通道（平台适配器）、路由（UMO → 配置）、唤醒规则**（@、唤醒词、私聊、白名单、限流、会话开关）。
-- 大脑、记忆、人格都在 LoAgent。被唤醒的消息由新增的流水线阶段 `loagent_forward` 转发给 LoAgent，LoAgent 决定回复什么或者不说话。
-- 一份 AstrBot 配置 = 一个人格 = LoAgent 的一个项目（`loagent_project`）。用 UMO 路由把平台、群、私聊分到不同配置。
+- **网关模式（LoAgent v3，`LOAGENT_GATEWAY=1`）**：AstrBot 只当各平台的接入 API。所有消息和平台事件原样上报给 LoAgent 的 Bot 服务（Bot 应用包的后端 `loagent-bots`），Bot 服务要发的话经网关的 HTTP 接口发出去。**唤醒、路由、白名单、审核都不在 AstrBot 里做**，AstrBot 自己的流水线在这个模式下不跑。协议见下面的「LoAgent 网关协议 v1」。
+- **旧通道（v2 底座用，网关模式关着时）**：AstrBot 管通道、UMO 路由和唤醒规则，被唤醒的消息由流水线阶段 `loagent_forward` 同步转发给 LoAgent，见「旧通道」一节。v2 下线后删掉。
 
-设计来源：LoAgent 仓库 `docs/design/architecture.md` 的 A13，`docs/design/plan/stage2/README.md` 的 S2-1。
+设计来源：LoAgent 仓库 `docs/design-v3/research/bots.md` 的 4.3、4.7、4.9（网关模式）；旧通道的设计在 v2 冻结分支的 `docs/design/architecture.md` A13。
+
+## LoAgent 网关协议 v1
+
+> 定于 2026-11-07（LoAgent 第三阶段 S3-2）。两边的类型：这里的 `astrbot/loagent_gateway/protocol.py`（pydantic），LoAgent 仓库的 `apps/bots/protocol`（Rust crate `loagent-bots-protocol`）。两边用同一组 JSON 样例做往返测试：`tests/fixtures/loagent_gateway/*.json` 是正本，LoAgent 那边有一份副本，它的测试会比对两份是否一致。
+
+### 分工和连接
+
+```
+QQ（NapCat）──OneBot v11 反向 WS──┐
+微信（wechat-selkies 网关）─OneBot v11 反向 WS──┤ AstrBot（网关模式）
+Telegram、飞书……（以后）──各平台 SDK──┘   │ ① POST {Bot 服务}/v1/events（异步上报，2xx 才算收到）
+                                         │ ② Bot 服务 → /api/v1/loagent/*（发送、查询、媒体）
+                                   Bot 服务（loagent-bots）
+```
+
+- **入站**：适配器放进事件队列的每个事件（消息、通知、请求），`EventBus` 先交给网关。网关把它转成协议事件，**先写进自己的 SQLite 发件箱**（`data/loagent_gateway/gateway.db`），再按顺序批量 POST 给 Bot 服务。Bot 服务存好以后回 2xx；没收到 2xx 就退避重试（1 秒起，最长 60 秒），AstrBot 重启也不丢。400、413、422 表示 Bot 服务永远不收，这批移进 `dead` 表留查。
+- **出站**：`POST /api/v1/loagent/send`。按 `instance + self_id` 找账号，**每次都带 `self_id`**，所以一个 OneBot 实例可以挂多个号（修 v2 的坑 1）。`request_id` 保证幂等：同一个 id 七天内再来，直接回上次的结果，不会再发。
+- **鉴权**：两个方向用同一个令牌 `LOAGENT_GATEWAY_TOKEN`，放在 `Authorization: Bearer …`。网关没配令牌时，它的接口一律回 503（`not_configured`）。
+- **AstrBot 控制台**不再给人用：网关模式下控制台的「更新」接口回 403（更新会拿原版覆盖本分支，v2 的坑 3），升级靠重新构建镜像。
+
+### 通用规则
+
+- JSON；**可选字段没有值时省略，不写 `null`**；列表和布尔值总是写出来；时间是 Unix 毫秒（`*_ms`）；id 一律是字符串。
+- 每个事件和发送请求带 `"v": 1`。网关不认识的版本回 400（`unsupported_version`）。
+- 不认识的段类型、事件类型直接报错，不静默丢。以后加类型就升版本。
+
+### 账号、会话、发送者
+
+| 类型 | 字段 |
+|---|---|
+| `AccountRef` | `platform`（网络：`qq`、`wechat`、`telegram`……）、`instance`（AstrBot 平台实例 id，发送时要用）、`self_id`（这个号自己的 id） |
+| `Conversation` | `kind`（`group` / `private`）、`id`（群号；私聊是对方的 id）、`name?`（群名，只作显示） |
+| `Sender` | `user_id`、`nickname`、`card?`（群名片）、`role?`（`owner` / `admin` / `member`）、`is_self`（这个号自己发的，比如从手机上） |
+
+- `platform`：QQ 和微信都走 OneBot v11（适配器都是 `aiocqhttp`），所以由平台实例的配置项 **`loagent_platform`** 说明是哪个网络（Bot 服务用 `/bots` 管理接口建实例时填上）；没填时 OneBot 实例是 `onebot`，其他适配器用适配器名。
+- 用户 id 只在同一个网络里可比。微信网关给的 id 是它自己映射出来的数字，换一个微信号就对不上，人物库合并时要注意。
+
+### 消息和段
+
+`Message`：`id`（平台消息 id；微信是网关给的稳定 id）、`account`、`conversation`、`sender`、`segments[]`、`reply_to?`、`at[]`、`sent_at_ms?`、`received_at_ms`。
+
+- `reply_to` 和 `at` 是从段里推出来的，方便唤醒规则：`reply_to` 是第一个 `reply` 段的消息 id；`at` 是被 @ 的 id，@全体是 `"all"`，按出现顺序、不重复。**以段为准**。
+- 收和发用同一套段（`type` 区分）：
+
+| `type` | 字段 | 说明 |
+|---|---|---|
+| `text` | `text` | |
+| `at` | `user_id`、`name?` | 真的 @，对方会收到提醒 |
+| `at_all` | — | @全体成员 |
+| `reply` | `message_id`、`sender_id?`、`sender_name?`、`text?`、`segments[]` | 引用。收到时网关填上原消息的发送者、文字和段（只展开一层）；发送时只看 `message_id` |
+| `image` | `media`、`summary?` | |
+| `sticker` | `media?`、`face_id?`、`name?` | 表情包（有 `media`）或平台表情（有 `face_id`，QQ 的 face） |
+| `voice` | `media`、`duration_ms?`、`text?` | `text` 是平台自带的转写 |
+| `video` | `media`、`cover?`、`duration_ms?` | |
+| `file` | `media` | 文件名在 `media.name` |
+| `forward` | `id?`、`nodes[]` | 合并转发。收到时平台常常只给 `id`；发送时用 `nodes`（`sender_id`、`sender_name`、`time_ms?`、`segments[]`） |
+| `poke` | `target_id` | 戳一戳 |
+| `share` | `url`、`title`、`content?`、`image?` | 链接卡片 |
+| `location` | `lat`、`lon`、`title?`、`content?` | |
+| `json` | `data` | 平台私有卡片（QQ ark），原样保留 |
+| `unknown` | `raw_type`、`data` | 其他，原样保留 |
+
+**媒体** `Media`：`url?`、`mime?`、`name?`、`size?`、`sha256?`。
+
+- 收到时，`url` 是平台自己的 `http(s)` 地址（QQ 的图片地址会过期，Bot 服务要尽快下载），或者 `gateway://<sha256>`：网关手里只有本地文件、`base64://` 或 `data:` 的媒体，先拷进自己的缓存（`data/loagent_gateway/media/`，按内容哈希存，保留 7 天），Bot 服务用 `GET /api/v1/loagent/media/<sha256>` 取。没有 `url` 表示平台说有这个媒体，但网关拿不到。
+- 发送时，`url` 可以是 `http(s)`（协议端自己去下）、`data:<mime>;base64,…`，或者先 `POST /api/v1/loagent/media` 上传拿到的 `gateway://` 引用。本地的媒体网关转成 `base64://` 交给协议端（协议端在别的容器里，看不到 AstrBot 的文件）。
+
+### 入站事件：`POST {Bot 服务}/v1/events`
+
+请求体 `{"events": [Event, …]}`，一批最多 50 个，按发生顺序。每个事件：
+
+```jsonc
+{ "v": 1, "id": "<网关的事件 id，32 位十六进制>", "dedupe_key": "…", "time_ms": 1794023157120,
+  "kind": "message" | "notice" | "account", … }
+```
+
+| `kind` | 其余字段 | 什么时候发 |
+|---|---|---|
+| `message` | `message` | 群和私聊的**每一条**消息，有没有 @ 都发（没唤醒的群消息也进消息记录，取代旧的 observe 旁路） |
+| `notice` | `account`、`conversation?`、`notice` | 平台通知和请求，见下表 |
+| `account` | `status`（`AccountStatus`） | 账号状态每变一次发一次 |
+
+`notice`（`type` 区分）：
+
+| `type` | 字段 | 来自 OneBot v11 |
+|---|---|---|
+| `member_joined` | `user_id`、`operator_id?` | `group_increase` |
+| `member_left` | `user_id`、`operator_id?`、`kicked` | `group_decrease`（`kick`、`kick_me` 算被踢） |
+| `recalled` | `message_id`、`user_id?`、`operator_id?` | `group_recall`、`friend_recall` |
+| `poke` | `user_id`、`target_id` | `notify` / `poke` |
+| `friend_added` | `user_id` | `friend_add` |
+| `request` | `request`（`friend` / `group_join` / `group_invite`）、`user_id`、`comment`、`flag` | `request` 事件。处理请求的接口以后再加 |
+| `other` | `adapter`、`raw` | 其余通知（禁言、改群名片……）原样带上 |
+
+**去重键** `dedupe_key`（Bot 服务按它去重，补交、重试都不会重复）：
+
+| 事件 | 键 |
+|---|---|
+| 消息 | `msg:<platform>:<self_id>:<消息 id>`；平台没给 id 时，用会话、发送者、时间、文字算一个 `h…` 哈希当 id |
+| 入群、退群 | `notice:<platform>:<self_id>:member_joined:<群>:<人>:<时间秒>`（`member_left` 同理） |
+| 撤回 | `notice:<platform>:<self_id>:recalled:<消息 id>` |
+| 戳一戳 | `notice:<platform>:<self_id>:poke:<会话>:<人>:<目标>:<时间秒>` |
+| 加好友 | `notice:<platform>:<self_id>:friend_added:<人>:<时间秒>` |
+| 请求 | `notice:<platform>:<self_id>:request:<种类>:<flag>` |
+| 其他通知 | `notice:<platform>:<self_id>:other:<原始 JSON 的 md5>` |
+| 账号状态 | `account:<platform>:<self_id>:<state>:<since_ms>` |
+
+**账号状态** `AccountStatus`：`account`、`state`、`reason?`、`detail?`、`nickname?`、`since_ms`、`last_seen_ms?`。
+
+| `state` | `reason` | 怎么判断（OneBot 实例：QQ、微信） |
+|---|---|---|
+| `connecting` | — | 协议端连上了（`meta_event` 的 `lifecycle` / `connect`），还没证明自己正常 |
+| `online` | — | 心跳里 `status.online` 和 `status.good` 都不是 false，或者收到了这个号的消息、通知 |
+| `offline` | `kicked` | NapCat 的 `bot_offline` 通知：被平台踢下线，要重新扫码 |
+| `offline` | `unhealthy` | 心跳里 `online` 或 `good` 是 false |
+| `offline` | `heartbeat_timeout` | 超过 3 个心跳间隔没有心跳（**假活**：连接还在、收不到东西） |
+| `offline` | `disconnected` | 协议端的反向 WebSocket 断了 |
+| `offline` | `platform_error` / `stopped` | AstrBot 的平台实例出错 / 被删或停了 |
+
+看门狗每 5 秒查一次。重连、重启容器、扫码这些动作由 Bot 服务做（bots.md 4.7），网关只报状态。
+
+### 出站：`POST /api/v1/loagent/send`
+
+```jsonc
+{ "v": 1, "request_id": "<bot.send 这个 Effect 的键>",
+  "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+  "conversation": { "kind": "group", "id": "123456" },
+  "segments": [ … ] }
+```
+
+- 成功（200）：`{ "request_id", "message_ids": […], "degraded": [{ "index", "from", "to", "reason" }…], "duplicate": false }`。段被拆开发时 `message_ids` 有多个；平台不回 id 时是空列表。
+- 顺序照原样，只是 `reply` 挪到最前面。在 QQ 上，`file`、`voice`、`video`、`forward`、`poke` 要单独成一条消息，网关按顺序拆开发。
+- **降级**：平台发不了的段，`share`、`location`、带 `nodes` 的 `forward`、带 `name` 的 `sticker` 改成文字，其余丢掉；每一处都记在 `degraded` 里。微信网关现在只能发文字、@ 和引用，图片、语音、文件都会被丢掉（要在 wechat-selkies 里补）。
+- 拆开发的中途失败：一条都没发出去时 `retryable = true`；已经发出去一部分时 `retryable = false`，免得重试重复发。
+
+### 查询
+
+| 接口 | 参数 | 回答 |
+|---|---|---|
+| `GET /api/v1/loagent/health` | — | `{ v, astrbot_version, enabled, outbox: { pending, last_delivered_ms?, last_error? } }` |
+| `GET /api/v1/loagent/accounts` | — | `{ accounts: [AccountStatus] }` |
+| `GET /api/v1/loagent/conversations` | `instance`、`self_id` | `{ conversations: [{ kind, id, name?, member_count? }] }`（群加好友；微信网关没有好友列表） |
+| `GET /api/v1/loagent/members` | `instance`、`self_id`、`group_id` | `{ members: [Member] }`，`Member` 是 `user_id`、`nickname`、`card?`、`role?`、`joined_at_ms?`、`last_sent_ms?` |
+| `GET /api/v1/loagent/profile` | `instance`、`self_id`、`user_id`、`group_id?` | `{ profile: Member }` |
+| `GET /api/v1/loagent/history` | `instance`、`self_id`、`kind`、`id`、`count?`（默认 20，最多 100）、`before?` | `{ messages: [Message] }`（NapCat 的 `get_group_msg_history` / `get_friend_msg_history`） |
+| `POST /api/v1/loagent/media` | 请求体是文件内容；`Content-Type`、`X-Media-Name`（URL 编码） | `{ media: Media }`，`url` 是 `gateway://…` |
+| `GET /api/v1/loagent/media/<sha256>` | — | 文件内容 |
+
+查询现在只有 OneBot 实例支持，别的适配器回 501（`unsupported`）。
+
+### 错误
+
+非 2xx 的回答都是 `{ "error": { "code", "message", "retryable" } }`：
+
+| `code` | HTTP | 说明 |
+|---|---|---|
+| `unauthorized` | 401 | 令牌不对 |
+| `invalid_request` / `unsupported_version` | 400 | 请求体不对 / 版本不认识 |
+| `account_not_found` | 404 | 没有这个实例，或者 `platform` 和实例对不上 |
+| `account_offline` | 503 | 号没连上、被踢、不健康。`retryable = true`，Bot 服务的 Effects 会重试，过了时效的标成投递失败 |
+| `unsupported_segment` / `media_unavailable` | 422 | 整条都发不了 / 媒体读不到 |
+| `unsupported` | 501 | 这个平台没有这个查询 |
+| `platform_error` | 502 | 协议端报错 |
+| `not_configured` | 503 | 网关没配令牌 |
+
+### 配置
+
+| 环境变量 | 配置项（默认配置里的 `loagent_gateway`） | 说明 |
+|---|---|---|
+| `LOAGENT_GATEWAY` | `enabled` | `1` 打开网关模式。打开后 AstrBot 的流水线（唤醒、白名单、插件指令、旧通道）都不跑 |
+| `LOAGENT_GATEWAY_ENDPOINT` | `endpoint` | Bot 服务的地址，事件 POST 到 `{endpoint}/v1/events`。没配时事件留在发件箱里 |
+| `LOAGENT_GATEWAY_TOKEN` | `token` | 两个方向共用的令牌 |
+| — | `heartbeat_grace`、`media_retention_days` | 心跳超时倍数（默认 3）、媒体缓存保留天数（默认 7） |
+
+平台实例的配置里加 `loagent_platform`（`qq`、`wechat`……），见上面「账号」。
+
+### 代码在哪
+
+全部在独立的包 `astrbot/loagent_gateway/` 里（`protocol`、`convert`、`outbound`、`accounts`、`media`、`store`、`gateway`、`api`、`settings`），AstrBot 自己的代码只改了三处接缝，每处几行：
+
+| 文件 | 改了什么 |
+|---|---|
+| `astrbot/core/event_bus.py` | `EventBus.observer`：分发前先交给它，它收下就不进流水线 |
+| `astrbot/core/core_lifecycle.py` | 建网关、挂上 `observer`、和别的任务一起跑 `gateway.run()` |
+| `astrbot/dashboard/api/app.py` | `loagent_gateway.api.install(app)`：挂路由、网关模式下拒绝自更新 |
+
+测试：`tests/test_loagent_gateway.py`（上报、投递重试、账号状态、发送和降级、查询、HTTP 接口）、`tests/test_loagent_gateway_protocol.py`（共用样例往返）。
 
 ## 保留
 
@@ -55,7 +241,9 @@
 | venv 体积 | 458 MB | 189 MB |
 | `astrbot/` 下 Python 代码 | 156,703 行 | 83,150 行 |
 
-## 新增
+## 旧通道：`loagent_forward` 和 `loagent_observe`（v2 底座用）
+
+> 网关模式关着时才跑。网关模式取代了它们：同步等回复改成异步上报加确认，旁路并进「每条消息都上报」，唤醒规则搬到 Bot 服务。v2 下线后删掉这一节和对应代码。
 
 ### 流水线阶段 `loagent_forward`
 
@@ -131,10 +319,11 @@
 - 上游是 `AstrBotDevs/AstrBot` 的 `master`；本分支从 `cd405f2a7`（v4.29.3 之后）开出。
 - 跟进时：`git fetch upstream && git merge upstream/master`（或 rebase）。冲突大多会落在下面几类，处理原则是「上游改了被删的模块就继续删，改了保留的模块就接受」：
   - 被删目录里的修改（modify/delete 冲突）：直接 `git rm`。
-  - 少数「接缝」文件是有意改过的，要手工合并：`core/core_lifecycle.py`、`core/star/context.py`（重写为精简版 Context）、`core/star/star_manager.py`、`core/star/star_tools.py`、`core/star/register/*`、`core/platform/astr_message_event.py`（去掉 `request_llm`）、`core/platform/manager.py`（不再启动 WebChat）、`core/pipeline/process_stage/stage.py`、`core/pipeline/scheduler.py`、`core/pipeline/session_status_check/stage.py`、`core/config/default.py`、`core/config/astrbot_config.py`、`core/utils/migra_helper.py`、`api/*`、`dashboard/api/{app,router,files,open_api,sessions}.py`、`dashboard/server.py`、`dashboard/services/{config,open_api,session_management,plugin,stat,bot_cleanup}_service.py`，以及前端的路由、侧边栏、配置页和会话管理页。
+  - 少数「接缝」文件是有意改过的，要手工合并：`core/event_bus.py`（网关的 `observer`）、`core/core_lifecycle.py`（含建网关的几行）、`core/star/context.py`（重写为精简版 Context）、`core/star/star_manager.py`、`core/star/star_tools.py`、`core/star/register/*`、`core/platform/astr_message_event.py`（去掉 `request_llm`）、`core/platform/manager.py`（不再启动 WebChat）、`core/pipeline/process_stage/stage.py`、`core/pipeline/scheduler.py`、`core/pipeline/session_status_check/stage.py`、`core/config/default.py`、`core/config/astrbot_config.py`、`core/utils/migra_helper.py`、`api/*`、`dashboard/api/{app,router,files,open_api,sessions}.py`（`app.py` 含挂网关接口的一行）、`dashboard/server.py`、`dashboard/services/{config,open_api,session_management,plugin,stat,bot_cleanup}_service.py`，以及前端的路由、侧边栏、配置页和会话管理页。
   - 上游新增的 LLM / Agent 功能：不合进来；新增的平台适配器：保留。
   - 依赖：合并 `pyproject.toml` / `requirements.txt` 后，再按上面的「删除 / 依赖」一栏删掉 LLM 相关包。
-- 合并后在 LoAgent 的 `ci-py` 容器里跑 `uv sync && uv run pytest -q tests`，前端在 `ci` 容器里跑 `pnpm install && pnpm build && node --test tests/*.test.mjs && node scripts/check-i18n-keys.mjs`。
+  - 网关自己的包 `astrbot/loagent_gateway/` 是新增的，上游没有，不会冲突。
+- 合并后跑 `uv sync && uv run pytest -q tests`（LoAgent v3 在本机 Mac 上跑；v2 底座当年在 `ci-py` 容器里跑），前端跑 `pnpm install && pnpm build && node --test tests/*.test.mjs && node scripts/check-i18n-keys.mjs`。网关的两个测试文件必须过。
 
 ## 打包注意
 
@@ -148,4 +337,4 @@
 
 - AstrBot 以 **AGPL-3.0-or-later** 发布，本分支继续沿用：保留上游的 `LICENSE`、版权声明和作者信息，`pyproject.toml` 的 `license` 不变。
 - fork（`Ry3nZhao/AstrBot`）是公开仓库，所有修改都以源码形式公开，满足 AGPL 第 13 条「通过网络提供服务时公开修改后源码」的要求。
-- LoAgent 只通过 HTTP 和这个网关通信（`/api/channel/message`、`/im/messages`），两者是独立的程序，LoAgent 的许可证不受影响。
+- LoAgent 只通过 HTTP 和这个网关通信（网关模式：`/v1/events`、`/api/v1/loagent/*`；旧通道：`/api/channel/message`、`/im/messages`），两者是独立的程序，LoAgent 的许可证不受影响。

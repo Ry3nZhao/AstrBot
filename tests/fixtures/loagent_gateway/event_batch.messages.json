@@ -1,0 +1,106 @@
+{
+  "events": [
+    {
+      "v": 1,
+      "id": "6f1c2b0e9d8a4c7b8e5f4a3b2c1d0e9f",
+      "dedupe_key": "msg:qq:10001:777",
+      "time_ms": 1794023157120,
+      "kind": "message",
+      "message": {
+        "id": "777",
+        "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+        "conversation": { "kind": "group", "id": "123456", "name": "测试群" },
+        "sender": { "user_id": "20002", "nickname": "Alice", "card": "阿丽", "role": "admin", "is_self": false },
+        "segments": [
+          {
+            "type": "reply",
+            "message_id": "555",
+            "sender_id": "10001",
+            "sender_name": "小助手",
+            "text": "看这张图",
+            "segments": [
+              { "type": "text", "text": "看这张图" },
+              { "type": "image", "media": { "url": "https://multimedia.nt.qq.com.cn/download?appid=1407&fileid=abc", "name": "A1B2.jpg" } }
+            ]
+          },
+          { "type": "at", "user_id": "10001", "name": "小助手" },
+          { "type": "text", "text": " 这是哪里？" },
+          { "type": "at", "user_id": "30003", "name": "Bob" },
+          { "type": "at_all" },
+          { "type": "image", "media": { "url": "https://multimedia.nt.qq.com.cn/download?appid=1407&fileid=def", "name": "C3D4.png" }, "summary": "[图片]" },
+          { "type": "sticker", "face_id": "14", "name": "微笑" }
+        ],
+        "reply_to": "555",
+        "at": ["10001", "30003", "all"],
+        "sent_at_ms": 1794023157000,
+        "received_at_ms": 1794023157100
+      }
+    },
+    {
+      "v": 1,
+      "id": "0a1b2c3d4e5f60718293a4b5c6d7e8f9",
+      "dedupe_key": "msg:qq:10001:778",
+      "time_ms": 1794023160050,
+      "kind": "message",
+      "message": {
+        "id": "778",
+        "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+        "conversation": { "kind": "private", "id": "20002" },
+        "sender": { "user_id": "20002", "nickname": "Alice", "is_self": false },
+        "segments": [
+          { "type": "voice", "media": { "url": "gateway://9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "mime": "audio/amr", "name": "voice.amr", "size": 4096, "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08" }, "duration_ms": 3000 },
+          { "type": "file", "media": { "url": "https://grouptalk.c2c.qq.com/file?fid=xyz", "name": "报告.pdf", "size": 102400 } },
+          { "type": "video", "media": { "url": "https://multimedia.nt.qq.com.cn/video?fid=v1" }, "cover": { "url": "https://multimedia.nt.qq.com.cn/thumb?fid=v1" } },
+          { "type": "sticker", "media": { "url": "https://gxh.vip.qq.com/club/item/parcel/item/ab/abcdef/raw300.gif" }, "name": "[动画表情]" },
+          { "type": "image", "media": { "name": "lost.jpg" } }
+        ],
+        "at": [],
+        "sent_at_ms": 1794023160000,
+        "received_at_ms": 1794023160020
+      }
+    },
+    {
+      "v": 1,
+      "id": "aa00bb11cc22dd33ee44ff5566778899",
+      "dedupe_key": "msg:wechat:900001:41",
+      "time_ms": 1794023200000,
+      "kind": "message",
+      "message": {
+        "id": "41",
+        "account": { "platform": "wechat", "instance": "wechat_main", "self_id": "900001" },
+        "conversation": { "kind": "group", "id": "800012" },
+        "sender": { "user_id": "800345", "nickname": "老王", "is_self": false },
+        "segments": [
+          { "type": "at", "user_id": "900001", "name": "小助手" },
+          { "type": "text", "text": " 周末去哪" }
+        ],
+        "at": ["900001"],
+        "sent_at_ms": 1794023199000,
+        "received_at_ms": 1794023199900
+      }
+    },
+    {
+      "v": 1,
+      "id": "11112222333344445555666677778888",
+      "dedupe_key": "msg:qq:10001:779",
+      "time_ms": 1794023300000,
+      "kind": "message",
+      "message": {
+        "id": "779",
+        "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+        "conversation": { "kind": "group", "id": "123456", "name": "测试群" },
+        "sender": { "user_id": "10001", "nickname": "小助手", "role": "member", "is_self": true },
+        "segments": [
+          { "type": "forward", "id": "7412589630", "nodes": [] },
+          { "type": "share", "url": "https://example.com/a", "title": "一篇文章", "content": "摘要", "image": "https://example.com/a.png" },
+          { "type": "location", "lat": 39.9042, "lon": 116.4074, "title": "北京" },
+          { "type": "json", "data": { "app": "com.tencent.miniapp", "meta": { "detail": { "title": "小程序" } } } },
+          { "type": "unknown", "raw_type": "markdown_v2", "data": { "content": "**hi**" } },
+          { "type": "poke", "target_id": "20002" }
+        ],
+        "at": [],
+        "received_at_ms": 1794023299990
+      }
+    }
+  ]
+}

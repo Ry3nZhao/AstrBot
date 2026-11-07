@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "request_id": "bot.send:bot-1:qq:10001:group:123456:42",
+  "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+  "conversation": { "kind": "group", "id": "123456" },
+  "segments": [
+    { "type": "reply", "message_id": "777", "segments": [] },
+    { "type": "at", "user_id": "20002" },
+    { "type": "text", "text": " 这是故宫。" },
+    { "type": "image", "media": { "url": "data:image/png;base64,iVBORw0KGgo=", "mime": "image/png" } },
+    { "type": "sticker", "face_id": "14" }
+  ]
+}

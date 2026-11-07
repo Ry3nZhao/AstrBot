@@ -174,6 +174,12 @@ class AstrBotCoreLifecycle:
             self.astrbot_config_mgr,
         )
 
+        # LoAgent gateway (LOAGENT.md): reports every event, takes send requests.
+        from astrbot.loagent_gateway import LoAgentGateway
+
+        self.loagent_gateway = LoAgentGateway.from_core(self)
+        self.event_bus.observer = self.loagent_gateway.observe_event
+
         # 记录启动时间
         self.start_time = int(time.time())
 
@@ -214,6 +220,8 @@ class AstrBotCoreLifecycle:
         ]
         if temp_dir_cleaner_task:
             tasks_.append(temp_dir_cleaner_task)
+        if gateway := getattr(self, "loagent_gateway", None):
+            tasks_.append(asyncio.create_task(gateway.run(), name="loagent_gateway"))
         for task in tasks_:
             self.curr_tasks.append(
                 asyncio.create_task(self._task_wrapper(task), name=task.get_name()),

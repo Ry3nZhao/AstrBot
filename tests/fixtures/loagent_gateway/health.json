@@ -1,0 +1,1 @@
+{ "v": 1, "astrbot_version": "4.29.3", "enabled": true, "outbox": { "pending": 3, "last_delivered_ms": 1794023157200, "last_error": "connection refused" } }

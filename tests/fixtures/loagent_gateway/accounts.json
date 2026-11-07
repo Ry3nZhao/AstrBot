@@ -1,0 +1,12 @@
+{
+  "accounts": [
+    {
+      "account": { "platform": "qq", "instance": "qq_main", "self_id": "10001" },
+      "state": "online", "nickname": "小助手", "since_ms": 1794020000000, "last_seen_ms": 1794023157100
+    },
+    {
+      "account": { "platform": "wechat", "instance": "wechat_main", "self_id": "900001" },
+      "state": "connecting", "since_ms": 1794023000000
+    }
+  ]
+}

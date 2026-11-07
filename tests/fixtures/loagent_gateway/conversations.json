@@ -1,0 +1,6 @@
+{
+  "conversations": [
+    { "kind": "group", "id": "123456", "name": "测试群", "member_count": 42 },
+    { "kind": "private", "id": "20002", "name": "Alice" }
+  ]
+}

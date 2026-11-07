@@ -1,0 +1,6 @@
+{
+  "members": [
+    { "user_id": "20002", "nickname": "Alice", "card": "阿丽", "role": "admin", "joined_at_ms": 1700000000000, "last_sent_ms": 1794023157000 },
+    { "user_id": "30003", "nickname": "Bob", "role": "member" }
+  ]
+}

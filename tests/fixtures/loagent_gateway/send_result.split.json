@@ -1,0 +1,8 @@
+{
+  "request_id": "bot.send:bot-1:qq:10001:private:20002:43",
+  "message_ids": ["901", "902", "903", "904"],
+  "degraded": [
+    { "index": 4, "from": "share", "to": "text", "reason": "aiocqhttp 不能发链接卡片，改成「标题 + 链接」的文字" }
+  ],
+  "duplicate": false
+}
