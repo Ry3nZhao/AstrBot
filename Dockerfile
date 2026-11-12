@@ -22,6 +22,9 @@ RUN pnpm build \
 FROM python:3.12-slim
 WORKDIR /AstrBot
 
+# A flaky mirror should not fail the build: apt retries each download.
+RUN echo 'Acquire::Retries "10";' > /etc/apt/apt.conf.d/80-retries
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     build-essential \
