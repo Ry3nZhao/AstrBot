@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
@@ -883,6 +884,42 @@ def test_settings_env_overrides_config(tmp_path):
         },
     )
     assert (s.enabled, s.endpoint, s.token) == (True, "http://b", "e")
+
+
+def test_platforms_declared_in_the_environment():
+    from astrbot.loagent_gateway.settings import apply_platforms, declared_platforms
+
+    assert declared_platforms({}) == []
+    declared = declared_platforms(
+        {
+            "LOAGENT_GATEWAY_PLATFORMS": json.dumps(
+                [
+                    {"id": "wx", "type": "aiocqhttp", "ws_reverse_port": 6200},
+                    {"id": "qq", "type": "aiocqhttp", "enable": False},
+                ]
+            )
+        }
+    )
+    platforms = [
+        {"id": "wx", "type": "aiocqhttp", "ws_reverse_port": 6199, "old": True},
+        {"id": "tg", "type": "telegram"},
+    ]
+    apply_platforms(platforms, declared)
+    # The same id is replaced (nothing of the old entry kept), the others added;
+    # enabled unless the declaration says otherwise.
+    assert platforms == [
+        {"enable": True, "id": "wx", "type": "aiocqhttp", "ws_reverse_port": 6200},
+        {"id": "tg", "type": "telegram"},
+        {"enable": False, "id": "qq", "type": "aiocqhttp"},
+    ]
+    for bad in (
+        "{",
+        "{}",
+        '[{"id": "a"}]',
+        '[{"id": "a", "type": "x"}, {"id": "a", "type": "y"}]',
+    ):
+        with pytest.raises(ValueError):
+            declared_platforms({"LOAGENT_GATEWAY_PLATFORMS": bad})
 
 
 def test_media_store_ingest_and_cleanup(tmp_path):

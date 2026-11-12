@@ -35,7 +35,7 @@ from .accounts import AccountTracker
 from .convert import ONEBOT, platform_kind
 from .media import MediaStore
 from .outbound import OutboundError, chain_from_segments, plan_onebot
-from .settings import GatewaySettings
+from .settings import GatewaySettings, apply_platforms, declared_platforms
 from .store import GatewayStore, now_ms
 
 PlatformsGetter = Callable[[], list[Platform]]
@@ -89,6 +89,13 @@ class LoAgentGateway:
         from astrbot.core.config.default import VERSION
 
         settings = GatewaySettings.resolve(core.astrbot_config)
+        if settings.enabled:
+            # The protocol sides LoAgent runs (LOAGENT_GATEWAY_PLATFORMS), before the
+            # platform manager starts the instances.
+            try:
+                apply_platforms(core.astrbot_config["platform"], declared_platforms())
+            except ValueError as e:
+                logger.error(f"LoAgent gateway: {e}")
         return cls(
             settings,
             lambda: list(core.platform_manager.platform_insts),

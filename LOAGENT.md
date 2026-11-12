@@ -183,6 +183,7 @@ Telegram、Discord、LINE──各平台 SDK──┘   │ ① POST {Bot 服务
 | `LOAGENT_GATEWAY_ENDPOINT` | `endpoint` | Bot 服务的地址，事件 POST 到 `{endpoint}/v1/events`。没配时事件留在发件箱里 |
 | `LOAGENT_GATEWAY_TOKEN` | `token` | 两个方向共用的令牌 |
 | — | `heartbeat_grace`、`media_retention_days` | 心跳超时倍数（默认 3）、媒体缓存保留天数（默认 7） |
+| `LOAGENT_GATEWAY_PLATFORMS` | — | 平台实例的 JSON 列表（每项像 `cmd_config.json` 里 `platform` 的一项，至少有 `id`、`type`）。网关模式下每次启动时放进配置：同 `id` 的替换，其余的加上，不写回配置文件。LoAgent 的 Bot 服务用它声明自己起的协议端（比如微信网关的 OneBot v11 反向 WS 端口），不用到控制台里配 |
 
 平台实例的配置里加 `loagent_platform`（`qq`、`wechat`……），见上面「账号」。
 
